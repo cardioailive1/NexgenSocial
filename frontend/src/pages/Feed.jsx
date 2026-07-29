@@ -102,7 +102,7 @@ export default function Feed() {
 
       <form onSubmit={submitPost} className="card" style={{ padding: 16, marginBottom: 20 }}>
         <div style={{ display: "flex", gap: 10 }}>
-          <img className="avatar" src={user?.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${user?.username}`} alt="" />
+          <img className="avatar" src={api.mediaUrl(user?.avatarUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${user?.username}`} alt="" />
           <textarea
             placeholder="Start a thread…"
             value={body}

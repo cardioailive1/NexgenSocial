@@ -108,7 +108,7 @@ export default function PostCard({ post, viewerUsername, onChanged }) {
     <article className="card" style={{ padding: 18, marginBottom: 14 }}>
       <div style={{ display: "flex", gap: 12 }}>
         <Link to={`/u/${post.author.username}`}>
-          <img className="avatar" src={post.author.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${post.author.username}`} alt="" />
+          <img className="avatar" src={api.mediaUrl(post.author.avatarUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${post.author.username}`} alt="" />
         </Link>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>

@@ -9,6 +9,8 @@ const MAX_SECONDS = 60;
 // an existing video file from disk still works too (see the label below).
 export default function QuickVideoRecorder({ onPosted }) {
   const [open, setOpen] = useState(false);
+  const [streamReady, setStreamReady] = useState(false); // tracks readiness in STATE, not just the ref, so the UI actually re-renders once the camera is ready
+  const [includeAudio, setIncludeAudio] = useState(true);
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [previewBlob, setPreviewBlob] = useState(null);
@@ -23,14 +25,16 @@ export default function QuickVideoRecorder({ onPosted }) {
   async function openRecorder() {
     setError("");
     setOpen(true);
+    setStreamReady(false);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: includeAudio });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.muted = true;
         videoRef.current.play();
       }
+      setStreamReady(true); // <-- this is what actually unlocks the Start button now
     } catch {
       setError("Camera access was blocked. Allow camera and microphone access, or attach a video file instead.");
     }
@@ -39,6 +43,7 @@ export default function QuickVideoRecorder({ onPosted }) {
   function stopStream() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    setStreamReady(false);
   }
 
   function closeRecorder() {
@@ -103,9 +108,15 @@ export default function QuickVideoRecorder({ onPosted }) {
 
   if (!open) {
     return (
-      <button type="button" className="btn btn-primary" onClick={openRecorder} style={{ fontSize: 13 }}>
-        ● Record video
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <button type="button" className="btn btn-primary" onClick={openRecorder} style={{ fontSize: 13 }}>
+          ● Record video
+        </button>
+        <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "var(--slate-400)" }}>
+          <input type="checkbox" checked={includeAudio} onChange={(e) => setIncludeAudio(e.target.checked)} />
+          Include microphone audio
+        </label>
+      </div>
     );
   }
 
@@ -116,14 +127,18 @@ export default function QuickVideoRecorder({ onPosted }) {
       {!previewBlob && (
         <>
           <video ref={videoRef} style={{ width: "100%", borderRadius: 10, background: "#000", maxHeight: 360, objectFit: "cover" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, flexWrap: "wrap", gap: 8 }}>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: recording ? "var(--danger)" : "var(--slate-400)" }}>
-              {recording ? `● REC ${seconds}s / ${MAX_SECONDS}s` : "Ready"}
+              {recording
+                ? `● REC ${seconds}s / ${MAX_SECONDS}s`
+                : streamReady
+                  ? `Ready — recording ${includeAudio ? "video + audio" : "video only (muted)"}`
+                  : "Requesting camera access…"}
             </span>
             <div style={{ display: "flex", gap: 8 }}>
               <button type="button" className="btn btn-ghost" onClick={closeRecorder}>Cancel</button>
               {!recording ? (
-                <button type="button" className="btn btn-primary" onClick={startRecording} disabled={!streamRef.current}>Start</button>
+                <button type="button" className="btn btn-primary" onClick={startRecording} disabled={!streamReady}>Start</button>
               ) : (
                 <button type="button" className="btn btn-primary" onClick={stopRecording}>Stop</button>
               )}

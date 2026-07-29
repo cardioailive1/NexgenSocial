@@ -1,5 +1,6 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
+import { api } from "../api";
 import logo from "../assets/logo.jpg";
 
 const navLinkStyle = ({ isActive }) => ({
@@ -47,7 +48,7 @@ export default function Navbar() {
           {user ? (
             <>
               <Link to={`/u/${user.username}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <img className="avatar" style={{ width: 30, height: 30 }} src={user.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.username}`} alt="" />
+                <img className="avatar" style={{ width: 30, height: 30 }} src={api.mediaUrl(user.avatarUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${user.username}`} alt="" />
                 <span style={{ fontSize: 13, fontWeight: 600 }}>{user.displayName}</span>
                 {user.tier === "PREMIUM" && <span className="premium-pill">Premium</span>}
               </Link>

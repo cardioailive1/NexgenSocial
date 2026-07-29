@@ -44,7 +44,7 @@ export default function Friends() {
           <h2 className="eyebrow" style={{ marginBottom: 10 }}>Invitations</h2>
           {data.incomingRequests.map((req) => (
             <div key={req.id} className="card" style={{ padding: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
-              <img className="avatar" src={req.sender.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${req.sender.username}`} alt="" />
+              <img className="avatar" src={api.mediaUrl(req.sender.avatarUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${req.sender.username}`} alt="" />
               <span style={{ flex: 1, fontWeight: 600, fontSize: 14 }}>{req.sender.displayName}</span>
               <button className="btn btn-primary" onClick={() => respond(req.id, "accept")}>Accept</button>
               <button className="btn btn-ghost" onClick={() => respond(req.id, "decline")}>Decline</button>
@@ -57,7 +57,7 @@ export default function Friends() {
       {data.friends.length === 0 && <p style={{ color: "var(--slate-400)" }}>No friends yet — invite someone above.</p>}
       {data.friends.map((f) => (
         <Link key={f.id} to={`/u/${f.username}`} className="card" style={{ padding: 14, marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
-          <img className="avatar" src={f.avatarUrl || `https://api.dicebear.com/7.x/identicon/svg?seed=${f.username}`} alt="" />
+          <img className="avatar" src={api.mediaUrl(f.avatarUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${f.username}`} alt="" />
           <span style={{ fontWeight: 600, fontSize: 14 }}>{f.displayName}</span>
           <span style={{ color: "var(--slate-400)", fontSize: 13 }}>@{f.username}</span>
         </Link>
