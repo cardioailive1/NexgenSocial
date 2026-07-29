@@ -1,7 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 
-const MAX_SECONDS = 60;
+// A truly unlimited recording is risky in a specific way: MediaRecorder
+// holds every chunk in the browser's memory until you stop, so a very long
+// recording can crash the tab from memory pressure alone, before it even
+// gets to uploading. 10 minutes is a generous ceiling that comfortably
+// covers normal use while keeping that risk bounded -- paired with a
+// matching increase in the server's upload size limit (see
+// backend/src/routes/posts.js) so a long recording doesn't get all the way
+// through and then fail the upload at the last step.
+const MAX_SECONDS = 600;
+const WARNING_SECONDS = 60; // show a heads-up once this many seconds remain
 
 // Records directly in the browser tab (getUserMedia + MediaRecorder) and
 // uploads the instant it's stopped -- no switching to a camera app, no
@@ -59,10 +68,21 @@ export default function QuickVideoRecorder({ onPosted }) {
   function startRecording() {
     if (!streamRef.current) return;
     chunksRef.current = [];
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-      ? "video/webm;codecs=vp9,opus"
-      : "video/webm";
-    const recorder = new MediaRecorder(streamRef.current, { mimeType });
+    // Safari doesn't support WebM in MediaRecorder at all -- it needs MP4
+    // instead. Blindly falling back to "video/webm" (as if only the codec
+    // detail was in question) would throw there. Check each candidate
+    // explicitly, and if none are supported, let the browser pick its own
+    // default rather than force an option that's guaranteed to fail.
+    const candidates = ["video/webm;codecs=vp9,opus", "video/webm", "video/mp4"];
+    const supported = candidates.find((type) => MediaRecorder.isTypeSupported(type));
+    let recorder;
+    try {
+      recorder = supported ? new MediaRecorder(streamRef.current, { mimeType: supported }) : new MediaRecorder(streamRef.current);
+    } catch {
+      setError("This browser doesn't support in-browser video recording. Try Chrome, Firefox, or a recent Safari, or attach a video file instead.");
+      return;
+    }
+    const mimeType = recorder.mimeType || supported || "video/webm";
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType });
@@ -93,7 +113,12 @@ export default function QuickVideoRecorder({ onPosted }) {
     setError("");
     try {
       const formData = new FormData();
-      formData.append("media", previewBlob, `quick-video-${Date.now()}.webm`);
+      // Extension must match the blob's real type (mp4 on Safari, webm
+      // elsewhere) -- the server saves the file with whatever extension is
+      // in this filename and serves it with a matching Content-Type, so a
+      // mismatch here breaks playback even though the upload "succeeds."
+      const ext = previewBlob.type.includes("mp4") ? "mp4" : "webm";
+      formData.append("media", previewBlob, `quick-video-${Date.now()}.${ext}`);
       await api.upload("/api/posts", formData);
       closeRecorder();
       onPosted?.();
@@ -127,10 +152,15 @@ export default function QuickVideoRecorder({ onPosted }) {
       {!previewBlob && (
         <>
           <video ref={videoRef} style={{ width: "100%", borderRadius: 10, background: "#000", maxHeight: 360, objectFit: "cover" }} />
+          {recording && seconds >= MAX_SECONDS - WARNING_SECONDS && (
+            <div style={{ color: "var(--danger)", fontSize: 12, marginTop: 6 }}>
+              Recording will stop automatically in {MAX_SECONDS - seconds}s (10-minute limit)
+            </div>
+          )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, flexWrap: "wrap", gap: 8 }}>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: recording ? "var(--danger)" : "var(--slate-400)" }}>
               {recording
-                ? `● REC ${seconds}s / ${MAX_SECONDS}s`
+                ? `● REC ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} / ${Math.floor(MAX_SECONDS / 60)}:00`
                 : streamReady
                   ? `Ready — recording ${includeAudio ? "video + audio" : "video only (muted)"}`
                   : "Requesting camera access…"}
