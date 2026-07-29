@@ -9,9 +9,10 @@ hub scaffolded for the next build phase.
 
 ```
                          ┌─────────────────────┐
-                         │   Static Frontend    │
-                         │  React + Vite (SPA)  │
-                         │  Render Static Site   │
+                         │      Frontend         │
+                         │  React + Vite (SPA)   │
+                         │  Node web service      │
+                         │  (server.js/Express)   │
                          └──────────┬───────────┘
                                     │ REST / JSON (fetch)
                                     │ Bearer JWT
@@ -174,13 +175,28 @@ npm run dev                 # http://localhost:4000
 cd frontend
 cp .env.example .env        # VITE_API_URL=http://localhost:4000
 npm install
-npm run dev                 # http://localhost:5173
+npm run dev                 # http://localhost:5173 -- hot-reloading dev server (Vite)
+```
+
+To run the frontend the same way it runs in production (build + Node server,
+no hot reload):
+
+```bash
+cd frontend
+npm run build                # writes static files to dist/
+npm start                    # node server.js, serves dist/ -- http://localhost:3000
 ```
 
 ## Deploying to Render
 
 This repo includes `render.yaml` (a Render **Blueprint**) that provisions all
-three pieces — API, static frontend, and Postgres — in one go.
+three pieces — API, frontend, and Postgres — in one go. The frontend is
+deployed as a **Node web service** (`frontend/server.js`, a small Express
+app that serves the built React files and handles the SPA fallback route),
+not Render's static-site/CDN hosting. Either way the app is client-rendered
+in the browser and talks to the same backend API — this only changes how
+the files get served. `npm start` runs `node server.js` after `npm run build`
+has produced the `dist` folder.
 
 1. Push this repo to GitHub.
 2. In the Render dashboard: **New → Blueprint**, point it at your repo. Render
