@@ -27,6 +27,18 @@ services:
         value: production
       - key: SPORTSDB_API_KEY
         value: "3" # shared free test key; swap for your own at thesportsdb.com/api.php for real usage
+      # Live-stream SFU: these work for signaling on Render fine, but the
+      # actual audio/video needs UDP reachable from the internet, which a
+      # standard Render web service does not expose. See README "Live
+      # streams: a dedicated SFU engine" before relying on this in
+      # production -- you likely want to run just this piece on a host
+      # that supports UDP (a plain VM, or a platform like Fly.io).
+      - key: MEDIASOUP_ANNOUNCED_IP
+        sync: false # set to this service's real public IP; streaming will silently fail without it
+      - key: MEDIASOUP_RTC_MIN_PORT
+        value: "40000"
+      - key: MEDIASOUP_RTC_MAX_PORT
+        value: "49999"
 
   # --- Frontend: a Node web service serving the built React app (not a
   # static-site/CDN deployment) -- see frontend/server.js. Client-side

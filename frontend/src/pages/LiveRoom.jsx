@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Device } from "mediasoup-client";
 import { api, wsSignalingUrl } from "../api";
+import { createSignalingClient } from "../signalingClient";
 import { useAuth } from "../AuthContext";
 
-const ICE_SERVERS = [{ urls: "stun:stun.l.google.com:19302" }];
-
+// SFU-based live streaming: the host's camera/mic go up to the server once
+// (via a mediasoup "send" transport), and every viewer pulls from the
+// server (via their own "recv" transport) rather than connecting directly
+// to the host. See backend/src/livestreamSignaling.js for the other half
+// of this protocol.
 export default function LiveRoom() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -16,15 +21,19 @@ export default function LiveRoom() {
   const [error, setError] = useState("");
 
   const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const wsRef = useRef(null);
+  const remoteVideoRefs = useRef(new Map()); // producerId -> <video> element ref callback target
+  const [remoteProducerIds, setRemoteProducerIds] = useState([]);
+
+  const deviceRef = useRef(null);
+  const sendTransportRef = useRef(null);
+  const recvTransportRef = useRef(null);
   const localStreamRef = useRef(null);
-  const peersRef = useRef(new Map()); // peerId -> RTCPeerConnection
-  const myConnectionIdRef = useRef(null);
-  const hostIdRef = useRef(null); // used by viewers
+  const consumersRef = useRef(new Map()); // producerId -> Consumer
 
   useEffect(() => {
     let cancelled = false;
+    let ws;
+    let signaling;
 
     async function setup() {
       const { stream: s } = await api.get(`/api/livestreams/${id}`);
@@ -33,105 +42,137 @@ export default function LiveRoom() {
       const hostRole = user?.username === s.host.username;
       setIsHost(hostRole);
 
-      const ws = new WebSocket(wsSignalingUrl());
-      wsRef.current = ws;
+      ws = new WebSocket(wsSignalingUrl());
+      signaling = createSignalingClient(ws);
+
+      signaling.onNotification(async (type, data) => {
+        if (type === "newProducer" && !hostRole) {
+          await consumeProducer(data.producerId);
+        }
+        if (type === "peerJoined" && hostRole && data.role === "viewer") {
+          setViewerCount((c) => c + 1);
+        }
+        if (type === "peerClosed" && !hostRole) {
+          setStatus("The broadcaster ended the stream.");
+        }
+        if (type === "peerClosed" && hostRole) {
+          setViewerCount((c) => Math.max(0, c - 1));
+        }
+      });
 
       ws.onopen = async () => {
-        if (hostRole) {
-          try {
-            const media = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            localStreamRef.current = media;
-            if (localVideoRef.current) {
-              localVideoRef.current.srcObject = media;
-              localVideoRef.current.muted = true;
-              localVideoRef.current.play();
-            }
-          } catch {
-            setError("Camera access was blocked — allow camera and microphone permissions to broadcast.");
-            return;
-          }
-        }
-        ws.send(JSON.stringify({ type: "join", roomId: id, role: hostRole ? "host" : "viewer", token: localStorage.getItem("ngs_token") }));
-        setStatus(hostRole ? "Live" : "Connecting to broadcaster…");
-      };
+        try {
+          setStatus("Joining…");
+          const { rtpCapabilities, existingProducers } = await signaling.request("join", {
+            roomId: id,
+            role: hostRole ? "host" : "viewer",
+            token: localStorage.getItem("ngs_token"),
+          });
 
-      ws.onmessage = async (event) => {
-        const msg = JSON.parse(event.data);
+          const device = new Device();
+          await device.load({ routerRtpCapabilities: rtpCapabilities });
+          deviceRef.current = device;
 
-        if (msg.type === "joined") {
-          myConnectionIdRef.current = msg.connectionId;
-          if (!hostRole) {
-            const host = msg.peers.find((p) => p.role === "host");
-            if (host) hostIdRef.current = host.id;
+          if (hostRole) {
+            await startBroadcasting(device);
           } else {
-            setViewerCount(msg.peers.filter((p) => p.role === "viewer").length);
+            await setupRecvTransport(device);
+            for (const p of existingProducers) await consumeProducer(p.producerId);
+            setStatus(existingProducers.length ? "Live" : "Waiting for the broadcaster…");
           }
-        }
-
-        if (msg.type === "peer-joined" && hostRole && msg.role === "viewer") {
-          setViewerCount((c) => c + 1);
-          const pc = createPeerConnection(msg.peerId, ws);
-          localStreamRef.current?.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current));
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          ws.send(JSON.stringify({ type: "offer", roomId: id, targetId: msg.peerId, payload: offer }));
-        }
-
-        if (msg.type === "peer-left") {
-          const pc = peersRef.current.get(msg.peerId);
-          if (pc) { pc.close(); peersRef.current.delete(msg.peerId); }
-          if (hostRole) setViewerCount((c) => Math.max(0, c - 1));
-          else setStatus("Broadcaster disconnected.");
-        }
-
-        if (msg.type === "offer" && !hostRole) {
-          const pc = createPeerConnection(msg.fromId, ws);
-          await pc.setRemoteDescription(new RTCSessionDescription(msg.payload));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          ws.send(JSON.stringify({ type: "answer", roomId: id, targetId: msg.fromId, payload: answer }));
-          setStatus("Live");
-        }
-
-        if (msg.type === "answer" && hostRole) {
-          const pc = peersRef.current.get(msg.fromId);
-          if (pc) await pc.setRemoteDescription(new RTCSessionDescription(msg.payload));
-        }
-
-        if (msg.type === "ice-candidate") {
-          const pc = peersRef.current.get(msg.fromId);
-          if (pc && msg.payload) {
-            try { await pc.addIceCandidate(new RTCIceCandidate(msg.payload)); } catch { /* ignore late candidates */ }
-          }
+        } catch (err) {
+          setError(err.message);
         }
       };
 
       ws.onerror = () => setError("Couldn't connect to the live signaling server.");
     }
 
-    function createPeerConnection(peerId, ws) {
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
-      pc.onicecandidate = (e) => {
-        if (e.candidate) ws.send(JSON.stringify({ type: "ice-candidate", roomId: id, targetId: peerId, payload: e.candidate }));
-      };
-      pc.ontrack = (e) => {
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = e.streams[0];
-          remoteVideoRef.current.play();
+    async function startBroadcasting(device) {
+      let media;
+      try {
+        media = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      } catch {
+        setError("Camera access was blocked — allow camera and microphone permissions to broadcast.");
+        return;
+      }
+      localStreamRef.current = media;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = media;
+        localVideoRef.current.muted = true;
+        localVideoRef.current.play();
+      }
+
+      const transportParams = await signaling.request("createTransport", {});
+      const sendTransport = device.createSendTransport(transportParams);
+      sendTransportRef.current = sendTransport;
+
+      sendTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
+        signaling.request("connectTransport", { transportId: sendTransport.id, dtlsParameters }).then(callback).catch(errback);
+      });
+      sendTransport.on("produce", ({ kind, rtpParameters }, callback, errback) => {
+        signaling.request("produce", { transportId: sendTransport.id, kind, rtpParameters }).then(({ id }) => callback({ id })).catch(errback);
+      });
+
+      for (const track of media.getTracks()) {
+        await sendTransport.produce({ track });
+      }
+      setStatus("Live");
+    }
+
+    async function setupRecvTransport(device) {
+      const transportParams = await signaling.request("createTransport", {});
+      const recvTransport = device.createRecvTransport(transportParams);
+      recvTransportRef.current = recvTransport;
+
+      recvTransport.on("connect", ({ dtlsParameters }, callback, errback) => {
+        signaling.request("connectTransport", { transportId: recvTransport.id, dtlsParameters }).then(callback).catch(errback);
+      });
+    }
+
+    async function consumeProducer(producerId) {
+      const device = deviceRef.current;
+      const recvTransport = recvTransportRef.current;
+      if (!device || !recvTransport) return;
+
+      const params = await signaling.request("consume", {
+        transportId: recvTransport.id,
+        producerId,
+        rtpCapabilities: device.rtpCapabilities,
+      });
+
+      const consumer = await recvTransport.consume({
+        id: params.id,
+        producerId: params.producerId,
+        kind: params.kind,
+        rtpParameters: params.rtpParameters,
+      });
+      consumersRef.current.set(producerId, consumer);
+      await signaling.request("resumeConsumer", { consumerId: consumer.id });
+
+      setRemoteProducerIds((ids) => [...new Set([...ids, producerId])]);
+      setStatus("Live");
+
+      // Attach the track to its <video> element once React has rendered it
+      setTimeout(() => {
+        const el = remoteVideoRefs.current.get(producerId);
+        if (el) {
+          const mediaStream = new MediaStream([consumer.track]);
+          el.srcObject = mediaStream;
+          el.play().catch(() => {});
         }
-      };
-      peersRef.current.set(peerId, pc);
-      return pc;
+      }, 0);
     }
 
     setup();
 
     return () => {
       cancelled = true;
-      wsRef.current?.close();
+      ws?.close();
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
-      peersRef.current.forEach((pc) => pc.close());
-      peersRef.current.clear();
+      consumersRef.current.forEach((c) => c.close());
+      sendTransportRef.current?.close();
+      recvTransportRef.current?.close();
     };
   }, [id, user]);
 
@@ -153,15 +194,26 @@ export default function LiveRoom() {
 
       {error && <div className="card" style={{ padding: 14, color: "var(--danger)", fontSize: 13, marginBottom: 16 }}>{error}</div>}
 
-      <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
-        <video
-          ref={isHost ? localVideoRef : remoteVideoRef}
-          autoPlay
-          playsInline
-          controls={!isHost}
-          style={{ width: "100%", background: "#000", maxHeight: 420, display: "block" }}
-        />
-      </div>
+      {isHost && (
+        <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
+          <video ref={localVideoRef} autoPlay playsInline style={{ width: "100%", background: "#000", maxHeight: 420, display: "block" }} />
+        </div>
+      )}
+
+      {!isHost && remoteProducerIds.length === 0 && (
+        <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--slate-400)" }}>Waiting for video…</div>
+      )}
+      {!isHost && remoteProducerIds.map((pid) => (
+        <div key={pid} className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
+          <video
+            ref={(el) => { if (el) remoteVideoRefs.current.set(pid, el); }}
+            autoPlay
+            playsInline
+            controls
+            style={{ width: "100%", background: "#000", maxHeight: 420, display: "block" }}
+          />
+        </div>
+      ))}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span className="eyebrow">{status}</span>

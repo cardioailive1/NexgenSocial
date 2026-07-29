@@ -50,5 +50,12 @@ app.use((err, _req, res, _next) => {
 
 const PORT = process.env.PORT || 4000;
 const server = require("http").createServer(app);
-attachSignaling(server);
-server.listen(PORT, () => console.log(`NexgenSocial API listening on :${PORT} (HTTP + WebSocket signaling at /ws/live)`));
+
+attachSignaling(server)
+  .then(() => {
+    server.listen(PORT, () => console.log(`NexgenSocial API listening on :${PORT} (HTTP + live-stream SFU signaling at /ws/live)`));
+  })
+  .catch((err) => {
+    console.error("Failed to start the live-stream SFU -- starting the rest of the API anyway:", err);
+    server.listen(PORT, () => console.log(`NexgenSocial API listening on :${PORT} (live streaming unavailable)`));
+  });

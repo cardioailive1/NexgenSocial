@@ -58,16 +58,61 @@ hub scaffolded for the next build phase.
   a licensing deal with a wire service (Getty, AP, etc.) — that's a business
   relationship, not something to fake with a scraper. This tab is genuinely
   just what people post.
-- **Live streams** — real peer-to-peer video via WebRTC (see
-  `backend/src/livestreamSignaling.js` and `frontend/src/pages/LiveRoom.jsx`).
-  The signaling server only relays small handshake messages; actual video
-  goes directly between browsers, so it costs nothing to run. The tradeoff:
-  it's a mesh topology, so it scales to roughly a handful of concurrent
-  viewers per broadcaster before the host's upload bandwidth becomes the
-  bottleneck. For real broadcast scale (hundreds or thousands of viewers),
-  swap in a hosted media server (SFU) — LiveKit, Mux, Cloudflare Stream, and
-  similar all have this as their whole product — which, like the OAuth
-  providers above, needs an account and credentials only you can create.
+- **Live streams: a dedicated SFU engine** — real server-side media routing
+  via [mediasoup](https://mediasoup.org), the same class of technology
+  production live-streaming products build on. This replaced an earlier
+  peer-to-peer version: the host's camera/mic go up to the server *once* (a
+  mediasoup "send" transport), and the server fans that out to every viewer
+  from its own router, rather than the host connecting to each viewer
+  directly. See `backend/src/sfu/` (worker pool, per-stream Room/Router,
+  transport creation) and `backend/src/livestreamSignaling.js` (the
+  WebSocket JSON-RPC protocol both sides speak), paired with
+  `frontend/src/pages/LiveRoom.jsx` using `mediasoup-client`.
+
+  **This was actually tested, not just written**: mediasoup was installed
+  and its native worker binary built and run in the same kind of sandboxed
+  environment this project ships from, confirming worker/router/transport
+  creation genuinely works. The full signaling protocol was then exercised
+  with real WebSocket clients — JWT-authenticated host join, unauthorized
+  host rejection, transport creation with real ICE candidates, and
+  role-based produce restrictions all passed against a live server. A full
+  two-browser video handshake (real ICE/DTLS/SRTP end to end) needs an
+  actual browser's WebRTC stack to verify and wasn't reproducible in this
+  environment, but every piece up to that point is confirmed working.
+
+  **The one thing that determines whether this works at all where you
+  deploy it: UDP.** mediasoup needs to bind a range of UDP ports and tell
+  each browser its real public IP via `MEDIASOUP_ANNOUNCED_IP` (see
+  `backend/src/sfu/transport.js`) — WebRTC media doesn't travel over your
+  regular HTTPS port. Typical PaaS "web service" hosting (including
+  Render's) is built around proxying a single HTTP(S) port and often
+  doesn't expose a UDP port range to the internet at all. Concretely:
+
+  - **Signaling** (the WebSocket handshake) works fine anywhere Node runs,
+    Render included — it's just HTTP.
+  - **The actual audio/video** needs the host running this to have a real
+    public IP with a UDP port range (`MEDIASOUP_RTC_MIN_PORT`–
+    `MEDIASOUP_RTC_MAX_PORT`, defaulting to 40000–49999) reachable from the
+    internet. A plain VM with a public IP (a DigitalOcean/Linode/EC2
+    instance, or similar) is the natural fit. Some platforms (Fly.io is a
+    notable example) do support UDP for exactly this use case — check
+    whichever host you pick before assuming it'll work.
+  - If UDP truly isn't available where you're deploying, mediasoup can fall
+    back to TCP (already enabled here via `enableTcp: true`), which works
+    through more restrictive networks but adds latency and won't perform as
+    well under load.
+  - Env vars this piece adds: `MEDIASOUP_ANNOUNCED_IP` (required for
+    anything beyond localhost), `MEDIASOUP_LISTEN_IP` (default `0.0.0.0`),
+    `MEDIASOUP_RTC_MIN_PORT` / `MEDIASOUP_RTC_MAX_PORT`, and
+    `MEDIASOUP_WORKER_COUNT` (default 1 — one worker per CPU core is the
+    usual scaling rule as concurrent rooms grow).
+
+  This is still meaningfully better than the mesh version for anything with
+  more than a few viewers, and it costs nothing beyond whatever VM you run
+  it on — no LiveKit/Mux/Cloudflare Stream account needed. But it does mean
+  the live-streaming piece specifically may need different hosting than the
+  rest of this app (which is plain HTTP and runs anywhere fine, Render
+  included).
 
 ### Frontier features (things mainstream platforms don't offer)
 
