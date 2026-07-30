@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import PostCard from "../components/PostCard";
 import QuickVideoRecorder from "../components/QuickVideoRecorder";
+import SponsoredCard from "../components/SponsoredCard";
 import { useAuth } from "../AuthContext";
 
 const DEFAULT_WEIGHTS = { recency: 0.5, engagement: 0.3, diversity: 0.2 };
@@ -9,6 +10,7 @@ const DEFAULT_WEIGHTS = { recency: 0.5, engagement: 0.3, diversity: 0.2 };
 export default function Feed() {
   const { user } = useAuth();
   const [posts, setPosts] = useState(null);
+  const [ads, setAds] = useState([]);
   const [body, setBody] = useState("");
   const [file, setFile] = useState(null);
   const [audience, setAudience] = useState("PUBLIC");
@@ -27,6 +29,9 @@ export default function Feed() {
     const { posts, feedWeights } = await api.get("/api/posts/feed");
     setPosts(posts);
     if (feedWeights) setWeights(feedWeights);
+    // Ads are fetched separately so a failure here (or an empty ad
+    // inventory) never blocks the actual feed from rendering.
+    api.get("/api/ads/serve?limit=3").then(({ ads }) => setAds(ads)).catch(() => setAds([]));
   }
 
   useEffect(() => {
@@ -164,7 +169,17 @@ export default function Feed() {
           Your feed is quiet. Follow people or post the first thread.
         </div>
       )}
-      {posts?.map((post) => <PostCard key={post.id} post={post} viewerUsername={user?.username} onChanged={load} />)}
+      {/* Interleave a sponsored card after every 3rd post rather than
+          stacking them at the top -- less intrusive, and ads at the very top
+          of a feed read as spam. */}
+      {posts?.map((post, i) => (
+        <div key={post.id}>
+          <PostCard post={post} viewerUsername={user?.username} onChanged={load} />
+          {ads.length > 0 && (i + 1) % 3 === 0 && (
+            <SponsoredCard ad={ads[(Math.floor((i + 1) / 3) - 1) % ads.length]} />
+          )}
+        </div>
+      ))}
     </div>
   );
 }

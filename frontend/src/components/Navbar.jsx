@@ -41,6 +41,9 @@ export default function Navbar() {
             <NavLink to="/celebrity" style={navLinkStyle}>Celebrity</NavLink>
             <NavLink to="/news" style={navLinkStyle}>News</NavLink>
             <NavLink to="/live" style={navLinkStyle}>Live</NavLink>
+            <NavLink to="/profile-setup" style={navLinkStyle}>My Profile</NavLink>
+            <NavLink to="/places" style={navLinkStyle}>Places</NavLink>
+            <NavLink to="/ads" style={navLinkStyle}>Ads</NavLink>
           </nav>
         )}
 

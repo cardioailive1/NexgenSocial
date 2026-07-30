@@ -18,6 +18,9 @@ import Celebrity from "./pages/Celebrity";
 import BreakingNews from "./pages/BreakingNews";
 import LiveStreams from "./pages/LiveStreams";
 import LiveRoom from "./pages/LiveRoom";
+import ProfileSetup from "./pages/ProfileSetup";
+import Places from "./pages/Places";
+import AdManager from "./pages/AdManager";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -49,6 +52,9 @@ export default function App() {
         <Route path="/news" element={<Protected><BreakingNews /></Protected>} />
         <Route path="/live" element={<Protected><LiveStreams /></Protected>} />
         <Route path="/live/:id" element={<Protected><LiveRoom /></Protected>} />
+        <Route path="/profile-setup" element={<Protected><ProfileSetup /></Protected>} />
+        <Route path="/places" element={<Protected><Places /></Protected>} />
+        <Route path="/ads" element={<Protected><AdManager /></Protected>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
