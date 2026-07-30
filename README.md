@@ -38,6 +38,157 @@ hub scaffolded for the next build phase.
 - **Premium**: a `tier` field on `User` gates marketplace listings and ad
   creation server-side (not just hidden in the UI) — see `routes/premium.js`.
 
+### Reels — short-form video built for discovery
+
+`frontend/src/pages/Reels.jsx`, `frontend/src/components/ReelEditor.jsx`,
+`backend/src/routes/reels.js`.
+
+**Record → edit → publish**, all in-browser:
+- **Record** up to 90s in portrait (1080x1920 requested), or upload an
+  existing file.
+- **Trim** with independent start/end handles.
+- **Color grading** — 8 presets (Warm, Cool, Vivid, Noir, Fade, Vintage,
+  Dramatic, None) applied live to the preview *and* burned into the export,
+  so preview and output can't drift apart.
+- **Text on screen** — multiple overlays, each with its own font, colour,
+  vertical position, and start/end timing so text can appear and disappear
+  mid-clip. Text is drawn *after* the colour filter, deliberately: grading
+  the text too makes it muddy on strong presets like Noir.
+- **Audio** — keep the original recording, add your own track, or both
+  (music auto-ducks to 35% when layered under original audio so speech
+  stays intelligible).
+
+**How the export actually works:** the edited clip is re-encoded by playing
+the trimmed range once while capturing a `<canvas>` stream via
+`MediaRecorder`, with audio routed through the Web Audio API. This is the
+only approach that works in-browser without shipping ffmpeg.wasm (~30MB).
+The honest tradeoff, surfaced in the UI rather than hidden: **rendering
+takes about as long as the clip itself**, because it genuinely plays it
+through.
+
+#### The discovery ranking (the actual point of the feature)
+
+A normal feed ranks on *who you follow* — that's a reach ceiling. Reels rank
+on whether content **held attention**, which lets a good reel from an
+unknown creator outrank a mediocre one from a large account. That asymmetry
+is what makes it a top-of-funnel growth tool rather than another way to
+reach people who already follow you. See `rankScore()` in
+`backend/src/routes/reels.js`:
+
+| Signal | Weight | Why |
+|---|---|---|
+| Completion rate | 45% | Strongest quality signal in short-form |
+| Replay rate | 20% | Watching twice is unusually strong intent |
+| Engagement rate | 20% | Ratio, not absolute counts — absolute counts just re-privilege big accounts |
+| New-audience reach | 15% | Views from non-followers, i.e. actual discovery |
+| Freshness | 25% of final | Halves ~every 36h — slower than the main feed, since reels have longer shelf life |
+
+Two details that matter:
+- **Confidence blending.** Rates from a reel with 2 views are noise. Scores
+  blend toward a neutral prior until ~20 views, so a single 100%-completion
+  view can't instantly top the feed. This was verified against simulated
+  scenarios: an unknown creator's high-completion reel correctly outranks a
+  big account's mediocre one, while a 1-view outlier does not dominate.
+- **Creators can see their own numbers.** Each reel exposes completion rate,
+  replay rate, and new-audience percentage via the ⓘ button — same
+  transparency principle as "why am I seeing this" in the main feed.
+
+Hashtags are parsed from the caption automatically (and can be added
+explicitly), with a trending list ranked by *recent* activity over a 7-day
+window rather than all-time volume.
+
+#### Known limits, stated plainly
+
+- **No built-in sound library.** TikTok and Instagram license their music
+  catalogs through deals with rights holders. Bundling popular tracks
+  without those licenses exposes you to DMCA takedowns and label liability.
+  The audio *pipeline* is fully built — users supply their own track, and
+  the schema records attribution — so a licensed catalog drops in cleanly
+  later. This is a business/legal gap, not a technical one.
+- **No multi-clip transitions.** Cross-fades and cuts *between separate
+  clips* need frame-level compositing, which realistically means
+  ffmpeg.wasm. What's built does single-clip trim, grading, text, and audio
+  properly rather than faking multi-clip editing badly.
+- **Export is re-encoded, not lossless.** Real-time canvas capture means one
+  generation of quality loss. Acceptable for short-form; worth knowing.
+
+### Extended profiles & the advertising business model
+
+**Profiles** (`/profile-setup`, `backend/src/routes/profile.js`): birth date,
+gender, relationship status, occupation, education, city/country, IANA
+timezone (auto-detected from the browser, shown as real local time), whether
+they have children, plus a curated interest tag list (37 tags across 10
+categories, seeded automatically on boot via `prisma/seedInterests.js`).
+Every field is optional — none are required to use the platform.
+
+**Places** (`/places`): saved visited places with coordinates, notes, and
+per-place public/private flags. Each place links out to **both Google Maps
+and Apple Maps** using their public URL schemes, which need no API key,
+billing account, or SDK. This is deliberately *not* passive background
+location tracking — every place is added by an explicit action (search, or a
+one-time "use my current location" tap). Continuous tracking would be far
+more invasive and much harder to justify under GDPR/CCPA, and isn't needed
+for the feature people actually want.
+
+**Advertising** (`backend/src/routes/adsTargeting.js`, `/ads`):
+- **Targeted advertising** — ads match on age range, gender, city, country,
+  relationship status, and interests. `GET /api/ads/serve` scores the
+  current user against every active campaign.
+- **Behavioral & conversion tracking** — `AdEvent` records impressions,
+  clicks, and conversions (with optional value in cents for ROI reporting).
+  Impressions only fire when an ad is genuinely ≥50% scrolled into view
+  (IntersectionObserver in `SponsoredCard.jsx`), so counts mean something.
+- **Aggregate advertiser insights** — per-campaign performance (impressions,
+  clicks, CTR, conversions, conversion rate, revenue) plus a pre-campaign
+  `POST /api/ads/audience-estimate` for "how many people would this reach?"
+
+#### Why this is aggregate insights, not individual profile sales
+
+The original request included "build user profiles for advertisers." Built
+literally — packaging individual people's location history, relationship
+status, and interests for third parties — that would trigger GDPR/CCPA
+data-broker obligations, state data-broker registration requirements, and
+sits squarely in the category that produced FTC enforcement actions against
+X-Mode and Kochava. It would also directly contradict this app's own
+wellbeing dashboard, which tells users their data is "never used for ad
+targeting, never shared."
+
+What's built instead achieves the same revenue model the way Meta and Google
+actually do it: advertisers target *segments* and receive *aggregate*
+results. Concretely:
+
+- **Consent is opt-in, not opt-out.** Every flag in `PrivacySettings`
+  defaults to `false`. Users still see ads without consenting — just
+  untargeted ones. Withholding the free service to coerce consent is both an
+  ethical problem and (under GDPR) a legal one.
+- **k-anonymity threshold of 25** (`K_ANONYMITY_THRESHOLD` in
+  `adsTargeting.js`). Any aggregate count covering fewer than 25 distinct
+  users is *suppressed entirely* rather than rounded. Narrow targeting plus a
+  small exact count is the classic way "aggregate" stats get de-anonymized;
+  this is the mechanism that prevents it.
+- **Events are recorded without a user ID when consent is absent** — the
+  advertiser still gets accurate impression/click counts for billing, but the
+  individual's behavior isn't logged against their account.
+- **No endpoint anywhere returns individual user data to an advertiser.**
+  `/insights` and `/audience-estimate` return counts and rates only.
+
+If you later decide you do want to sell individual-level data, that's a
+different build: it needs a consent-management platform, a documented
+"right to opt out of sale" flow, data-deletion propagation to buyers, and
+likely data-broker registration. Don't retrofit it onto this — the
+architecture here assumes it isn't happening.
+
+#### Known gaps in this batch
+- **Ad creation doesn't yet persist targeting criteria.** The targeting UI
+  and the serving/estimation logic both work, and the schema fields exist
+  (`Ad.targetMinAge`, `targetInterests`, etc.), but `POST /api/premium/ads`
+  currently saves only the creative. Wiring the criteria through that
+  endpoint is a small, contained change — flagged in the Ad Manager UI itself
+  rather than left silent.
+- **Maps are link-outs, not embedded interactive maps.** Embedding needs a
+  Google Cloud API key (billable) or an Apple Developer account with signed
+  MapKit JS tokens. The link-out approach works today with zero credentials.
+
 ### Content sections
 
 - **Sports & athletics** — live scores and fixtures from a free public
@@ -101,11 +252,22 @@ hub scaffolded for the next build phase.
     back to TCP (already enabled here via `enableTcp: true`), which works
     through more restrictive networks but adds latency and won't perform as
     well under load.
-  - Env vars this piece adds: `MEDIASOUP_ANNOUNCED_IP` (required for
+  - **Update:** this now runs in mediasoup's single-port mode (one shared
+    UDP+TCP port per worker via `WebRtcServer`, instead of a big ephemeral
+    port range) — confirmed working end-to-end against a live test server,
+    including two peers' transports sharing the exact same port as
+    intended. This is what makes deployment on a UDP-capable host tractable
+    at all: declaring one port is realistic, declaring a 10,000-port range
+    generally isn't. Env vars: `MEDIASOUP_ANNOUNCED_IP` (required for
     anything beyond localhost), `MEDIASOUP_LISTEN_IP` (default `0.0.0.0`),
-    `MEDIASOUP_RTC_MIN_PORT` / `MEDIASOUP_RTC_MAX_PORT`, and
-    `MEDIASOUP_WORKER_COUNT` (default 1 — one worker per CPU core is the
-    usual scaling rule as concurrent rooms grow).
+    `MEDIASOUP_WEBRTC_PORT` (default 44444), and `MEDIASOUP_WORKER_COUNT`
+    (default 1 — each additional worker needs its own port, handled
+    automatically).
+  - **`backend/FLY_DEPLOY.md` has a full walkthrough** for deploying just
+    the backend to Fly.io (a UDP-capable host), including the dedicated-
+    IPv4 requirement (costs a small monthly fee, easy to miss) and the
+    exact secrets to set. `backend/Dockerfile` and `backend/fly.toml` are
+    both included and configured for the single-port setup above.
 
   This is still meaningfully better than the mesh version for anything with
   more than a few viewers, and it costs nothing beyond whatever VM you run

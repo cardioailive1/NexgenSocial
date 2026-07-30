@@ -30,6 +30,7 @@ export default function Navbar() {
         {user && (
           <nav style={{ display: "flex", gap: 4, flex: 1, justifyContent: "center" }}>
             <NavLink to="/" style={navLinkStyle} end>Feed</NavLink>
+            <NavLink to="/reels" style={navLinkStyle}>Reels</NavLink>
             <NavLink to="/groups" style={navLinkStyle}>Groups</NavLink>
             <NavLink to="/premium" style={navLinkStyle}>Premium</NavLink>
             <NavLink to="/friends" style={navLinkStyle}>Friends</NavLink>

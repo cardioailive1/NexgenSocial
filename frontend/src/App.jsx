@@ -21,6 +21,7 @@ import LiveRoom from "./pages/LiveRoom";
 import ProfileSetup from "./pages/ProfileSetup";
 import Places from "./pages/Places";
 import AdManager from "./pages/AdManager";
+import Reels from "./pages/Reels";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/profile-setup" element={<Protected><ProfileSetup /></Protected>} />
         <Route path="/places" element={<Protected><Places /></Protected>} />
         <Route path="/ads" element={<Protected><AdManager /></Protected>} />
+        <Route path="/reels" element={<Protected><Reels /></Protected>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
