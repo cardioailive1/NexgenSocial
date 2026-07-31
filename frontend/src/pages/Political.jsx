@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { useAuth } from "../AuthContext";
+import { MediaPicker, MediaGallery } from "../components/MediaAttach";
 
 const PAGE_TYPES = [
   ["CANDIDATE", "Candidate"],
@@ -63,6 +64,11 @@ export default function Political() {
   const [showPageForm, setShowPageForm] = useState(false);
   const [pageForm, setPageForm] = useState({ type: "CAMPAIGN", name: "", organization: "", description: "", websiteUrl: "", region: "" });
   const [creatingPage, setCreatingPage] = useState(false);
+  const [pageAvatar, setPageAvatar] = useState([]);
+  const [adMedia, setAdMedia] = useState([]);
+  const [postForm, setPostForm] = useState({ pageId: "", body: "" });
+  const [postMedia, setPostMedia] = useState([]);
+  const [posting, setPosting] = useState(false);
 
   const [showAdForm, setShowAdForm] = useState(false);
   const [adForm, setAdForm] = useState({ pageId: "", headline: "", body: "", targetUrl: "", paidForBy: "", spend: "", region: "" });
@@ -112,8 +118,14 @@ export default function Political() {
     setCreatingPage(true);
     setError("");
     try {
-      await api.post("/api/political/pages", pageForm);
+      // Was api.post with JSON, so the avatar the backend expected never
+      // actually arrived. FormData is required for any file to be sent.
+      const fd = new FormData();
+      Object.entries(pageForm).forEach(([k, v]) => { if (v) fd.append(k, v); });
+      if (pageAvatar[0]) fd.append("avatar", pageAvatar[0]);
+      await api.upload("/api/political/pages", fd);
       setPageForm({ type: "CAMPAIGN", name: "", organization: "", description: "", websiteUrl: "", region: "" });
+      setPageAvatar([]);
       setShowPageForm(false);
       await loadPages(typeFilter);
     } catch (err) {
@@ -132,11 +144,13 @@ export default function Political() {
     setCreatingAd(true);
     setError("");
     try {
-      await api.post("/api/political/ads", {
-        ...adForm,
-        spendCents: adForm.spend ? Math.round(parseFloat(adForm.spend) * 100) : 0,
-      });
+      const fd = new FormData();
+      Object.entries(adForm).forEach(([k, v]) => { if (v && k !== "spend") fd.append(k, v); });
+      fd.append("spendCents", String(adForm.spend ? Math.round(parseFloat(adForm.spend) * 100) : 0));
+      if (adMedia[0]) fd.append("media", adMedia[0]);
+      await api.upload("/api/political/ads", fd);
       setAdForm({ pageId: "", headline: "", body: "", targetUrl: "", paidForBy: "", spend: "", region: "" });
+      setAdMedia([]);
       setShowAdForm(false);
       await loadPages(typeFilter);
       setTab("archive");
@@ -145,6 +159,29 @@ export default function Political() {
       setError(err.message);
     } finally {
       setCreatingAd(false);
+    }
+  }
+
+  async function publishPost(e) {
+    e.preventDefault();
+    if (!postForm.pageId || !postForm.body.trim()) {
+      setError("Choose a page and write something to post.");
+      return;
+    }
+    setPosting(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("body", postForm.body);
+      postMedia.forEach((f) => fd.append("media", f));
+      await api.upload(`/api/political/pages/${postForm.pageId}/posts`, fd);
+      setPostForm({ pageId: "", body: "" });
+      setPostMedia([]);
+      await loadPages(typeFilter);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPosting(false);
     }
   }
 
@@ -231,6 +268,7 @@ export default function Political() {
               <textarea rows={2} placeholder="What is this page about?" value={pageForm.description} onChange={(e) => setPageForm({ ...pageForm, description: e.target.value })} />
               <input type="text" placeholder="Website (optional)" value={pageForm.websiteUrl} onChange={(e) => setPageForm({ ...pageForm, websiteUrl: e.target.value })} />
               <input type="text" placeholder="Region / jurisdiction (e.g. Ohio, US)" value={pageForm.region} onChange={(e) => setPageForm({ ...pageForm, region: e.target.value })} />
+              <MediaPicker files={pageAvatar} onChange={(f) => setPageAvatar(f.slice(0, 1))} max={1} label="🖼 Page logo / photo" />
               <button className="btn btn-primary" type="submit" disabled={creatingPage} style={{ justifySelf: "start" }}>
                 {creatingPage ? "Creating…" : "Create page"}
               </button>
@@ -239,6 +277,19 @@ export default function Political() {
 
           {myPages.length > 0 && (
             <>
+              <form onSubmit={publishPost} className="card" style={{ padding: 16, marginBottom: 16, display: "grid", gap: 10 }}>
+                <h2 className="eyebrow">Post to one of your pages</h2>
+                <select value={postForm.pageId} onChange={(e) => setPostForm({ ...postForm, pageId: e.target.value })} style={selectStyle}>
+                  <option value="">Choose a page…</option>
+                  {myPages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <textarea rows={3} placeholder="What do you want to say?" value={postForm.body} onChange={(e) => setPostForm({ ...postForm, body: e.target.value })} />
+                <MediaPicker files={postMedia} onChange={setPostMedia} max={10} />
+                <button className="btn btn-primary" type="submit" disabled={posting} style={{ justifySelf: "start" }}>
+                  {posting ? "Posting…" : "Publish post"}
+                </button>
+              </form>
+
               <button className="btn btn-ghost" onClick={() => setShowAdForm((v) => !v)} style={{ marginBottom: 12 }}>
                 {showAdForm ? "Cancel" : "+ Run a political ad"}
               </button>
@@ -261,6 +312,7 @@ export default function Political() {
                     <input type="text" placeholder="Spend (USD)" value={adForm.spend} onChange={(e) => setAdForm({ ...adForm, spend: e.target.value })} style={{ flex: 1, minWidth: 110 }} />
                     <input type="text" placeholder="Region" value={adForm.region} onChange={(e) => setAdForm({ ...adForm, region: e.target.value })} style={{ flex: 1, minWidth: 110 }} />
                   </div>
+                  <MediaPicker files={adMedia} onChange={(f) => setAdMedia(f.slice(0, 1))} max={1} label="🎬 Ad creative (photo or video)" />
                   <button className="btn btn-primary" type="submit" disabled={creatingAd} style={{ justifySelf: "start" }}>
                     {creatingAd ? "Submitting…" : "Run ad"}
                   </button>
@@ -301,7 +353,11 @@ export default function Political() {
               </div>
               <div style={{ fontWeight: 700, fontSize: 14 }}>{ad.headline}</div>
               <div style={{ fontSize: 13, color: "var(--slate-300)", marginTop: 4 }}>{ad.body}</div>
-              {ad.imageUrl && <img src={api.mediaUrl(ad.imageUrl)} alt="" style={{ width: "100%", borderRadius: 8, marginTop: 8, border: "1px solid var(--line)" }} />}
+              <MediaGallery
+                media={ad.mediaUrl ? [{ id: ad.id, url: ad.mediaUrl, kind: ad.mediaKind || "PHOTO", position: 0 }] : []}
+                legacyUrl={ad.imageUrl}
+                compact
+              />
 
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--line)", fontSize: 11, color: "var(--slate-400)", display: "grid", gap: 3 }}>
                 <div><strong style={{ color: "var(--slate-300)" }}>Paid for by:</strong> {ad.paidForBy}</div>

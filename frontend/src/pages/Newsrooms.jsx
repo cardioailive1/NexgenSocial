@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../AuthContext";
+import { MediaPicker, MediaGallery } from "../components/MediaAttach";
 
 function VerifiedBadge({ verified }) {
   return verified
@@ -20,9 +21,7 @@ function ArticleCard({ article, showNewsroom }) {
       )}
       <div style={{ fontWeight: 700, fontSize: 15 }}>{article.headline}</div>
       {article.standfirst && <div style={{ fontSize: 13, color: "var(--slate-300)", marginTop: 4 }}>{article.standfirst}</div>}
-      {article.imageUrl && (
-        <img src={api.mediaUrl(article.imageUrl)} alt="" style={{ width: "100%", borderRadius: 8, marginTop: 8, border: "1px solid var(--line)" }} />
-      )}
+      <MediaGallery media={article.media} legacyUrl={article.imageUrl} compact />
 
       {expanded && (
         <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 10, whiteSpace: "pre-wrap", color: "var(--slate-300)" }}>
@@ -67,6 +66,8 @@ export default function Newsrooms() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", organization: "", description: "", beat: "", region: "", websiteUrl: "" });
   const [creating, setCreating] = useState(false);
+  const [newsroomAvatar, setNewsroomAvatar] = useState([]);
+  const [articleMedia, setArticleMedia] = useState([]);
 
   const [showArticleForm, setShowArticleForm] = useState(false);
   const [article, setArticle] = useState({ newsroomId: "", headline: "", standfirst: "", body: "", byline: "", isBreaking: false });
@@ -107,8 +108,13 @@ export default function Newsrooms() {
     setCreating(true);
     setError("");
     try {
-      await api.post("/api/newsrooms", form);
+      // Was api.post with JSON, so the avatar never reached the server.
+      const fd = new FormData();
+      Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
+      if (newsroomAvatar[0]) fd.append("avatar", newsroomAvatar[0]);
+      await api.upload("/api/newsrooms", fd);
       setForm({ name: "", organization: "", description: "", beat: "", region: "", websiteUrl: "" });
+      setNewsroomAvatar([]);
       setShowForm(false);
       await loadNewsrooms();
     } catch (err) { setError(err.message); }
@@ -130,8 +136,10 @@ export default function Newsrooms() {
       fd.append("body", article.body);
       fd.append("byline", article.byline);
       fd.append("isBreaking", String(article.isBreaking));
+      articleMedia.forEach((f) => fd.append("media", f));
       await api.upload(`/api/newsrooms/${article.newsroomId}/articles`, fd);
       setArticle({ newsroomId: "", headline: "", standfirst: "", body: "", byline: "", isBreaking: false });
+      setArticleMedia([]);
       setShowArticleForm(false);
       await loadCoverage();
       setTab("coverage");
@@ -248,6 +256,7 @@ export default function Newsrooms() {
                 <input type="text" placeholder="Region" value={form.region} onChange={(e) => setForm({ ...form, region: e.target.value })} style={{ flex: 1, minWidth: 120 }} />
               </div>
               <input type="text" placeholder="Website (optional)" value={form.websiteUrl} onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} />
+              <MediaPicker files={newsroomAvatar} onChange={(f) => setNewsroomAvatar(f.slice(0, 1))} max={1} label="🖼 Newsroom logo" />
               <button className="btn btn-primary" type="submit" disabled={creating} style={{ justifySelf: "start" }}>
                 {creating ? "Creating…" : "Create newsroom"}
               </button>
@@ -289,6 +298,7 @@ export default function Newsrooms() {
                     <input type="checkbox" checked={article.isBreaking} onChange={(e) => setArticle({ ...article, isBreaking: e.target.checked })} />
                     Mark as breaking
                   </label>
+                  <MediaPicker files={articleMedia} onChange={setArticleMedia} max={10} label="📷 Add photos & video to this story" />
                   <button className="btn btn-primary" type="submit" disabled={publishing} style={{ justifySelf: "start" }}>
                     {publishing ? "Publishing…" : "Publish story"}
                   </button>

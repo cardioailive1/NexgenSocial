@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
+import { MediaGallery } from "../components/MediaAttach";
 
 export default function NewsroomDetail() {
   const { slug } = useParams();
@@ -93,7 +94,7 @@ export default function NewsroomDetail() {
           )}
           <div style={{ fontWeight: 700, fontSize: 15 }}>{a.headline}</div>
           {a.standfirst && <div style={{ fontSize: 13, color: "var(--slate-300)", marginTop: 4 }}>{a.standfirst}</div>}
-          {a.imageUrl && <img src={api.mediaUrl(a.imageUrl)} alt="" style={{ width: "100%", borderRadius: 8, marginTop: 8, border: "1px solid var(--line)" }} />}
+          <MediaGallery media={a.media} legacyUrl={a.imageUrl} compact />
           {expandedId === a.id && (
             <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 10, whiteSpace: "pre-wrap", color: "var(--slate-300)" }}>{a.body}</div>
           )}

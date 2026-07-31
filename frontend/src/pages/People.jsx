@@ -34,6 +34,7 @@ export default function People() {
       if (action === "unfollow") await api.delete(`/api/follows/${user.username}`);
       if (action === "friend") await api.post("/api/friends/requests", { username: user.username });
       if (action === "accept") await api.patch(`/api/friends/requests/${user.friendRequestId}`, { action: "accept" });
+      if (action === "cancel") await api.delete(`/api/friends/requests/${user.friendRequestId}`);
       await load(query);
     } catch (err) {
       setError(err.message);
@@ -54,7 +55,22 @@ export default function People() {
       );
     }
     if (u.friendStatus === "PENDING") {
-      return <span className="eyebrow" style={{ fontSize: 10 }}>Request sent</span>;
+      // Previously this was a dead end: a static "Request sent" label with
+      // no way to check on it or take it back. Now it can be cancelled here,
+      // and the Friends page lists it too.
+      return (
+        <>
+          <span className="eyebrow" style={{ fontSize: 10 }}>Request sent</span>
+          <button
+            className="btn btn-ghost btn-danger"
+            disabled={busyId === u.id}
+            onClick={() => act(u, "cancel")}
+            style={{ fontSize: 11, padding: "6px 10px" }}
+          >
+            Cancel
+          </button>
+        </>
+      );
     }
     return (
       <button className="btn btn-ghost" disabled={busyId === u.id} onClick={() => act(u, "friend")} style={{ fontSize: 11, padding: "6px 10px" }}>
@@ -68,7 +84,9 @@ export default function People() {
       <h1 className="h-display" style={{ fontSize: 22, marginBottom: 4 }}>People</h1>
       <p style={{ color: "var(--slate-400)", fontSize: 14, marginBottom: 16 }}>
         Everyone on NexgenSocial. Follow to see their posts, or send a friend
-        request to connect both ways.
+        request to connect both ways. Sent requests wait for the other person
+        to accept — you can track them on your{" "}
+        <Link to="/friends" style={{ color: "var(--cyan-300)" }}>Friends</Link> page.
       </p>
 
       <input
