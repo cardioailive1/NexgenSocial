@@ -67,6 +67,8 @@ export default function Newsrooms() {
   const [form, setForm] = useState({ name: "", organization: "", description: "", beat: "", region: "", websiteUrl: "" });
   const [creating, setCreating] = useState(false);
   const [newsroomAvatar, setNewsroomAvatar] = useState([]);
+  const [newsroomCover, setNewsroomCover] = useState([]);
+  const [newsroomMedia, setNewsroomMedia] = useState([]);
   const [articleMedia, setArticleMedia] = useState([]);
 
   const [showArticleForm, setShowArticleForm] = useState(false);
@@ -112,9 +114,13 @@ export default function Newsrooms() {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
       if (newsroomAvatar[0]) fd.append("avatar", newsroomAvatar[0]);
+      if (newsroomCover[0]) fd.append("cover", newsroomCover[0]);
+      newsroomMedia.forEach((f) => fd.append("media", f));
       await api.upload("/api/newsrooms", fd);
       setForm({ name: "", organization: "", description: "", beat: "", region: "", websiteUrl: "" });
       setNewsroomAvatar([]);
+      setNewsroomCover([]);
+      setNewsroomMedia([]);
       setShowForm(false);
       await loadNewsrooms();
     } catch (err) { setError(err.message); }
@@ -228,7 +234,9 @@ export default function Newsrooms() {
                   </div>
                   <div className="eyebrow" style={{ fontSize: 10, marginTop: 6 }}>
                     {n.articleCount} stories · {n.followerCount} followers
+                    {n.media?.length ? ` · ${n.media.length} media` : ""}
                   </div>
+                  {n.media?.length > 0 && <MediaGallery media={n.media} compact />}
                 </div>
                 <button className={n.followedByViewer ? "btn btn-ghost" : "btn btn-primary"}
                   disabled={busyId === n.id} onClick={() => toggleFollow(n)} style={{ fontSize: 11, padding: "6px 10px" }}>
@@ -257,6 +265,15 @@ export default function Newsrooms() {
               </div>
               <input type="text" placeholder="Website (optional)" value={form.websiteUrl} onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} />
               <MediaPicker files={newsroomAvatar} onChange={(f) => setNewsroomAvatar(f.slice(0, 1))} max={1} label="🖼 Newsroom logo" />
+              <MediaPicker files={newsroomCover} onChange={(f) => setNewsroomCover(f.slice(0, 1))} max={1} label="🏞 Cover image" />
+              <div>
+                <MediaPicker files={newsroomMedia} onChange={setNewsroomMedia} max={10} label="📷 Photos & videos for this newsroom" />
+                <p style={{ fontSize: 11, color: "var(--slate-400)", marginTop: 6, lineHeight: 1.5 }}>
+                  Studio shots, team photos, a channel trailer — anything that
+                  belongs to the newsroom itself rather than to one story. Story
+                  images are attached when you publish each piece.
+                </p>
+              </div>
               <button className="btn btn-primary" type="submit" disabled={creating} style={{ justifySelf: "start" }}>
                 {creating ? "Creating…" : "Create newsroom"}
               </button>

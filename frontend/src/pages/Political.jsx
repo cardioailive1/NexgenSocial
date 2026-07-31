@@ -36,7 +36,9 @@ function PageCard({ page, onToggleFollow, busy }) {
           </div>
           <div className="eyebrow" style={{ fontSize: 10, marginTop: 6 }}>
             {page.followerCount} followers · {page.postCount} posts · {page.adCount} ads
+            {page.media?.length ? ` · ${page.media.length} media` : ""}
           </div>
+          {page.media?.length > 0 && <MediaGallery media={page.media} compact />}
         </div>
         <button
           className={page.followedByViewer ? "btn btn-ghost" : "btn btn-primary"}
@@ -65,6 +67,8 @@ export default function Political() {
   const [pageForm, setPageForm] = useState({ type: "CAMPAIGN", name: "", organization: "", description: "", websiteUrl: "", region: "" });
   const [creatingPage, setCreatingPage] = useState(false);
   const [pageAvatar, setPageAvatar] = useState([]);
+  const [pageCover, setPageCover] = useState([]);
+  const [pageMedia, setPageMedia] = useState([]);
   const [adMedia, setAdMedia] = useState([]);
   const [postForm, setPostForm] = useState({ pageId: "", body: "" });
   const [postMedia, setPostMedia] = useState([]);
@@ -123,9 +127,13 @@ export default function Political() {
       const fd = new FormData();
       Object.entries(pageForm).forEach(([k, v]) => { if (v) fd.append(k, v); });
       if (pageAvatar[0]) fd.append("avatar", pageAvatar[0]);
+      if (pageCover[0]) fd.append("cover", pageCover[0]);
+      pageMedia.forEach((f) => fd.append("media", f));
       await api.upload("/api/political/pages", fd);
       setPageForm({ type: "CAMPAIGN", name: "", organization: "", description: "", websiteUrl: "", region: "" });
       setPageAvatar([]);
+      setPageCover([]);
+      setPageMedia([]);
       setShowPageForm(false);
       await loadPages(typeFilter);
     } catch (err) {
@@ -269,6 +277,8 @@ export default function Political() {
               <input type="text" placeholder="Website (optional)" value={pageForm.websiteUrl} onChange={(e) => setPageForm({ ...pageForm, websiteUrl: e.target.value })} />
               <input type="text" placeholder="Region / jurisdiction (e.g. Ohio, US)" value={pageForm.region} onChange={(e) => setPageForm({ ...pageForm, region: e.target.value })} />
               <MediaPicker files={pageAvatar} onChange={(f) => setPageAvatar(f.slice(0, 1))} max={1} label="🖼 Page logo / photo" />
+              <MediaPicker files={pageCover} onChange={(f) => setPageCover(f.slice(0, 1))} max={1} label="🏞 Cover image" />
+              <MediaPicker files={pageMedia} onChange={setPageMedia} max={10} label="📷 Photos & videos for this page" />
               <button className="btn btn-primary" type="submit" disabled={creatingPage} style={{ justifySelf: "start" }}>
                 {creatingPage ? "Creating…" : "Create page"}
               </button>
