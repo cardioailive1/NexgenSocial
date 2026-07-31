@@ -38,6 +38,104 @@ hub scaffolded for the next build phase.
 - **Premium**: a `tier` field on `User` gates marketplace listings and ad
   creation server-side (not just hidden in the UI) — see `routes/premium.js`.
 
+### Jobs
+
+`frontend/src/pages/Jobs.jsx`, `backend/src/routes/jobs.js`.
+
+Employers post roles; job seekers search, filter, and apply with a cover
+letter and resume (PDF/Word). Employers see applicants and move them through
+a pipeline (Submitted → Reviewing → Interviewing → Offered / Rejected).
+Applicants can withdraw but cannot change their own stage — only the
+employer moves an application forward.
+
+**Salary range is a structured, first-class field**, not free text in the
+description. That's deliberate: California, Colorado, New York, and
+Washington all require a good-faith pay range in job postings, and the EU
+Pay Transparency Directive introduces comparable duties. Structured fields
+also make ranges filterable, which buried free text never is. The posting
+form says this explicitly rather than leaving employers to discover it.
+
+Two things kept private on purpose:
+- **`employerNote`** on an application is never returned to the applicant.
+  Surfacing private hiring notes would be an unpleasant surprise and a
+  data-access complication.
+- Applicant contact details are only visible to the employer who posted
+  the role.
+
+**What this doesn't do:** we don't verify employers, screen postings for
+discriminatory language, or detect fraudulent listings. Job-board fraud is
+a real and common problem, so the UI carries a standing warning never to
+pay to apply. Automated screening and employer verification would be the
+natural next additions.
+
+### Privacy Policy & Terms of Use
+
+`frontend/src/legal/documents.js`, `frontend/src/pages/LegalDoc.jsx`.
+
+Both documents are readable at `/legal/privacy` and `/legal/terms`
+**without an account** — they have to be, since accepting them is required
+to create one. Acceptance is a required checkbox at signup, and the
+submit button stays disabled until it's ticked.
+
+**Acceptance is enforced server-side too**, in `routes/auth.js` — a request
+posted directly to the API without `acceptedTerms: true` is rejected.
+Otherwise the consent record could be bypassed entirely, which would defeat
+the point of having one. We store `acceptedTermsAt`, `acceptedPrivacyAt`,
+and `acceptedPolicyVersion` on the user, so you can tell who agreed to
+which version. Bump `POLICY_VERSION` in `documents.js` whenever the
+documents change materially.
+
+**These documents describe what this app actually does** — the real data
+collected, the real ad model, the k-anonymity threshold, the
+opt-in-by-default consent flags, the permanent political ad archive. Keep
+them in step with the code: if you change what the product does with user
+data, update these too and bump `POLICY_VERSION` so existing users are
+asked to re-accept.
+
+Governing law is the State of Delaware, USA; the operating entity and
+contact address is Corverxis Technologies, 6500 Emerald Parkway, Dublin,
+Ohio 43016.
+
+### Media Coverage — newsrooms & live broadcasts
+
+`frontend/src/pages/Newsrooms.jsx`, `NewsroomDetail.jsx`,
+`backend/src/routes/newsrooms.js`.
+
+A newsroom is an editorial identity — an outlet, show, or independent
+journalist — that publishes stories and broadcasts live under its own name.
+
+- **Newsroom pages** with beat, region, named responsible organization, and
+  a verified/unverified badge. Like political pages, the organization is
+  required at the API level, not just in the form.
+- **Stories** with headline, standfirst, body, byline, image, and a
+  "breaking" flag that surfaces them above other coverage.
+- **Visible corrections.** Editing a published story's body sets
+  `correctedAt`, which is displayed on the article. News that quietly
+  changes after publication is a real trust problem, so corrections are
+  shown rather than hidden — the same principle as post edit history.
+- **Live broadcasts attributed to the newsroom.** "Go live as [outlet]"
+  attaches the stream to the newsroom, and the server verifies you actually
+  own it — otherwise anyone could attach a trusted outlet's name to their
+  stream. Live newsrooms show a LIVE badge in the directory.
+
+**Note on an outdated placeholder:** the Premium page previously said this
+feature "needs a streaming provider (e.g. Mux or Cloudflare Stream) wired
+to a new Livestream model." That text was stale — the mediasoup SFU built
+earlier already handles live video with no third-party provider, and the
+`Livestream` model has existed since then. The placeholder has been
+replaced with links to the working pages.
+
+**Newsrooms vs. Breaking News:** `/newsrooms` is coverage published *on*
+NexgenSocial by newsrooms here. `/news` aggregates external RSS headlines
+from ABC/CNN/MSNBC/BBC. They're deliberately separate — mixing first-party
+publishing with third-party aggregation makes it unclear who is
+responsible for what.
+
+**Newsrooms vs. Political pages:** also deliberately separate models. A
+newsroom reporting *on* a campaign is a fundamentally different thing from
+the campaign's own page, and blurring them is exactly the confusion that
+erodes trust in a feed.
+
 ### Marketplace (with real media)
 
 `frontend/src/pages/Marketplace.jsx`, `backend/src/routes/marketplace.js`.

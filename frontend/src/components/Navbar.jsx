@@ -32,6 +32,7 @@ export default function Navbar() {
             <NavLink to="/" style={navLinkStyle} end>Feed</NavLink>
             <NavLink to="/reels" style={navLinkStyle}>Reels</NavLink>
             <NavLink to="/groups" style={navLinkStyle}>Groups</NavLink>
+            <NavLink to="/jobs" style={navLinkStyle}>Jobs</NavLink>
             <NavLink to="/marketplace" style={navLinkStyle}>Market</NavLink>
             <NavLink to="/political" style={navLinkStyle}>Political</NavLink>
             <NavLink to="/premium" style={navLinkStyle}>Premium</NavLink>
@@ -44,6 +45,7 @@ export default function Navbar() {
             <NavLink to="/sports" style={navLinkStyle}>Sports</NavLink>
             <NavLink to="/celebrity" style={navLinkStyle}>Celebrity</NavLink>
             <NavLink to="/news" style={navLinkStyle}>News</NavLink>
+            <NavLink to="/newsrooms" style={navLinkStyle}>Media</NavLink>
             <NavLink to="/live" style={navLinkStyle}>Live</NavLink>
             <NavLink to="/profile-setup" style={navLinkStyle}>My Profile</NavLink>
             <NavLink to="/places" style={navLinkStyle}>Places</NavLink>

@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import { POLICY_VERSION } from "../legal/documents";
 import { useAuth } from "../AuthContext";
 import logo from "../assets/logo.jpg";
 
 export default function Signup() {
   const [form, setForm] = useState({ displayName: "", username: "", email: "", password: "" });
   const [error, setError] = useState("");
+  const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -26,9 +28,18 @@ export default function Signup() {
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
+    if (!accepted) {
+      setError("Please accept the Terms of Use and Privacy Policy to continue.");
+      return;
+    }
     setBusy(true);
     try {
-      const { token, user } = await api.post("/api/auth/register", { ...form, inviteToken: inviteToken || undefined });
+      const { token, user } = await api.post("/api/auth/register", {
+        ...form,
+        inviteToken: inviteToken || undefined,
+        acceptedTerms: true,
+        policyVersion: POLICY_VERSION,
+      });
       login(token, user);
       navigate("/");
     } catch (err) {
@@ -56,8 +67,25 @@ export default function Signup() {
         <input type="text" placeholder="Username" value={form.username} onChange={set("username")} required />
         <input type="email" placeholder="Email" value={form.email} onChange={set("email")} required />
         <input type="password" placeholder="Password (min 8 characters)" value={form.password} onChange={set("password")} required />
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: "var(--slate-300)", lineHeight: 1.5 }}>
+          <input
+            type="checkbox"
+            checked={accepted}
+            onChange={(e) => setAccepted(e.target.checked)}
+            style={{ marginTop: 2, flexShrink: 0 }}
+          />
+          <span>
+            I have read and agree to the{" "}
+            <Link to="/legal/terms" target="_blank" style={{ color: "var(--cyan-300)", textDecoration: "underline" }}>Terms of Use</Link>
+            {" "}and{" "}
+            <Link to="/legal/privacy" target="_blank" style={{ color: "var(--cyan-300)", textDecoration: "underline" }}>Privacy Policy</Link>.
+            I understand NexgenSocial is free and funded by advertising, and that
+            ad personalisation is off unless I turn it on.
+          </span>
+        </label>
+
         {error && <div style={{ color: "var(--danger)", fontSize: 13 }}>{error}</div>}
-        <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? "Creating…" : "Create account"}</button>
+        <button className="btn btn-primary" type="submit" disabled={busy || !accepted}>{busy ? "Creating…" : "Create account"}</button>
       </form>
 
       <p style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "var(--slate-400)" }}>

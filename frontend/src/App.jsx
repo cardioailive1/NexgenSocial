@@ -25,6 +25,10 @@ import Reels from "./pages/Reels";
 import People from "./pages/People";
 import Marketplace from "./pages/Marketplace";
 import Political from "./pages/Political";
+import Newsrooms from "./pages/Newsrooms";
+import NewsroomDetail from "./pages/NewsroomDetail";
+import Jobs from "./pages/Jobs";
+import LegalDoc from "./pages/LegalDoc";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -63,6 +67,13 @@ export default function App() {
         <Route path="/people" element={<Protected><People /></Protected>} />
         <Route path="/marketplace" element={<Protected><Marketplace /></Protected>} />
         <Route path="/political" element={<Protected><Political /></Protected>} />
+        <Route path="/newsrooms" element={<Protected><Newsrooms /></Protected>} />
+        <Route path="/newsrooms/:slug" element={<Protected><NewsroomDetail /></Protected>} />
+        <Route path="/jobs" element={<Protected><Jobs /></Protected>} />
+        {/* Legal docs are intentionally NOT wrapped in <Protected> -- they
+            must be readable before signing up, since acceptance is required
+            to create an account in the first place. */}
+        <Route path="/legal/:doc" element={<LegalDoc />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

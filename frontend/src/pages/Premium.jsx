@@ -178,7 +178,20 @@ export default function Premium() {
           <Link to="/political" className="btn btn-primary">Open Political Place</Link>
         </div>
       )}
-      {tab === "media" && <RoadmapPanel label="Media Coverage & Live" desc="Newsroom pages and live broadcasts. Needs a streaming provider (e.g. Mux or Cloudflare Stream) wired to a new Livestream model." />}
+      {tab === "media" && (
+        <div className="card" style={{ padding: 24, textAlign: "center" }}>
+          <h3 className="h-display" style={{ margin: "0 0 8px", fontSize: 16 }}>Media Coverage &amp; Live</h3>
+          <p style={{ color: "var(--slate-400)", fontSize: 13, maxWidth: 420, margin: "0 auto 14px" }}>
+            Newsroom pages with published stories, visible corrections, and live
+            broadcasts attributed to the outlet. Live video runs on our own SFU —
+            no third-party streaming provider needed.
+          </p>
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+            <Link to="/newsrooms" className="btn btn-primary">Open Media Coverage</Link>
+            <Link to="/live" className="btn btn-ghost">Live broadcasts</Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
