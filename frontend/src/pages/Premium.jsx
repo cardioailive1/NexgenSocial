@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../AuthContext";
 
@@ -156,9 +157,27 @@ export default function Premium() {
         </p>
       )}
 
-      {tab === "marketplace" && (isPremium ? <Marketplace /> : <RoadmapPanel label="Marketplace" desc="Buy and sell within the community once you upgrade." />)}
+      {tab === "marketplace" && (
+        <div className="card" style={{ padding: 24, textAlign: "center" }}>
+          <h3 className="h-display" style={{ margin: "0 0 8px", fontSize: 16 }}>Marketplace</h3>
+          <p style={{ color: "var(--slate-400)", fontSize: 13, maxWidth: 380, margin: "0 auto 14px" }}>
+            The marketplace now lives on its own page, with multi-photo and video
+            listings, search, and condition/location details.
+          </p>
+          <Link to="/marketplace" className="btn btn-primary">Open Marketplace</Link>
+        </div>
+      )}
       {tab === "business" && (isPremium ? <AdsPanel category="BUSINESS" /> : <RoadmapPanel label="Business Place" desc="Run business storefronts and ads once you upgrade." />)}
-      {tab === "political" && <RoadmapPanel label="Political Place" desc="Campaign pages, issue-based groups, and political ad placements. Schema is in place (Ad category, Group topics) — UI ships next." />}
+      {tab === "political" && (
+        <div className="card" style={{ padding: 24, textAlign: "center" }}>
+          <h3 className="h-display" style={{ margin: "0 0 8px", fontSize: 16 }}>Political Place</h3>
+          <p style={{ color: "var(--slate-400)", fontSize: 13, maxWidth: 400, margin: "0 auto 14px" }}>
+            Campaign, candidate and issue pages, political ads with mandatory
+            "paid for by" disclosure, and a permanent public ad archive.
+          </p>
+          <Link to="/political" className="btn btn-primary">Open Political Place</Link>
+        </div>
+      )}
       {tab === "media" && <RoadmapPanel label="Media Coverage & Live" desc="Newsroom pages and live broadcasts. Needs a streaming provider (e.g. Mux or Cloudflare Stream) wired to a new Livestream model." />}
     </div>
   );

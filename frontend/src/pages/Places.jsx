@@ -12,6 +12,9 @@ export default function Places() {
   const [error, setError] = useState("");
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState(null);
+  const [searching, setSearching] = useState(false);
 
   async function load() {
     const { places } = await api.get("/api/profile/me/places");
@@ -22,7 +25,7 @@ export default function Places() {
   function useCurrentLocation() {
     setError("");
     if (!navigator.geolocation) {
-      setError("This browser doesn't support location access.");
+      setError("This browser doesn't support location access. Use the search box above instead.");
       return;
     }
     setLocating(true);
@@ -36,15 +39,58 @@ export default function Places() {
         setLocating(false);
       },
       (err) => {
-        setError(
-          err.code === err.PERMISSION_DENIED
-            ? "Location permission was denied. You can still enter coordinates or an address manually."
-            : "Couldn't get your location. Try again, or enter it manually."
-        );
+        // A denied permission is sticky -- the browser won't ask again on
+        // its own, so "try again" is useless advice without telling people
+        // how to actually unblock it.
+        if (err.code === err.PERMISSION_DENIED) {
+          setError(
+            "Location is blocked for this site. To unblock: click the padlock (or ⓘ) " +
+            "in your browser's address bar → Site settings / Permissions → set Location " +
+            "to Allow → reload this page. Or just search for the place by name above — " +
+            "that works without any permission."
+          );
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          setError("Your device couldn't determine a position. Search for the place by name instead.");
+        } else if (err.code === err.TIMEOUT) {
+          setError("Location lookup timed out. Search for the place by name instead.");
+        } else {
+          setError("Couldn't get your location. Search for the place by name instead.");
+        }
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
+  }
+
+  async function searchPlaces(e) {
+    e.preventDefault();
+    if (searchQuery.trim().length < 3) {
+      setError("Type at least 3 characters to search.");
+      return;
+    }
+    setSearching(true);
+    setError("");
+    try {
+      const { results } = await api.get(`/api/profile/geocode?q=${encodeURIComponent(searchQuery)}`);
+      setSearchResults(results);
+      if (results.length === 0) setError("No places matched that search. Try a broader term.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  function pickSearchResult(r) {
+    setForm((f) => ({
+      ...f,
+      name: f.name || r.name,
+      address: r.address,
+      latitude: r.latitude.toFixed(6),
+      longitude: r.longitude.toFixed(6),
+    }));
+    setSearchResults(null);
+    setSearchQuery("");
   }
 
   async function addPlace(e) {
@@ -105,6 +151,40 @@ export default function Places() {
 
       <form onSubmit={addPlace} className="card" style={{ padding: 16, marginBottom: 20, display: "grid", gap: 10 }}>
         <h2 className="eyebrow">Add a place</h2>
+        <div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type="text"
+              placeholder="Search for a place by name or address…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") searchPlaces(e); }}
+            />
+            <button type="button" className="btn btn-primary" onClick={searchPlaces} disabled={searching} style={{ whiteSpace: "nowrap" }}>
+              {searching ? "…" : "🔍 Search"}
+            </button>
+          </div>
+          {searchResults?.length > 0 && (
+            <div style={{ marginTop: 8, border: "1px solid var(--line)", borderRadius: 10, overflow: "hidden" }}>
+              {searchResults.map((r, i) => (
+                <button
+                  type="button"
+                  key={i}
+                  onClick={() => pickSearchResult(r)}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left", padding: "10px 12px",
+                    background: "var(--navy-950)", borderBottom: i < searchResults.length - 1 ? "1px solid var(--line)" : "none",
+                    fontSize: 12, color: "var(--slate-300)",
+                  }}
+                >
+                  <strong style={{ color: "var(--white)" }}>{r.name}</strong>
+                  <div style={{ fontSize: 11, color: "var(--slate-400)" }}>{r.address}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <input type="text" placeholder="Place name (e.g. Blue Bottle Coffee)" value={form.name} onChange={set("name")} />
         <input type="text" placeholder="Address (optional)" value={form.address} onChange={set("address")} />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

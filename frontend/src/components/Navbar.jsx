@@ -32,7 +32,10 @@ export default function Navbar() {
             <NavLink to="/" style={navLinkStyle} end>Feed</NavLink>
             <NavLink to="/reels" style={navLinkStyle}>Reels</NavLink>
             <NavLink to="/groups" style={navLinkStyle}>Groups</NavLink>
+            <NavLink to="/marketplace" style={navLinkStyle}>Market</NavLink>
+            <NavLink to="/political" style={navLinkStyle}>Political</NavLink>
             <NavLink to="/premium" style={navLinkStyle}>Premium</NavLink>
+            <NavLink to="/people" style={navLinkStyle}>People</NavLink>
             <NavLink to="/friends" style={navLinkStyle}>Friends</NavLink>
             <NavLink to="/invite" style={navLinkStyle}>Invite</NavLink>
             <NavLink to="/connections" style={navLinkStyle}>Connections</NavLink>

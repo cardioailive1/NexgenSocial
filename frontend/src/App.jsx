@@ -22,6 +22,9 @@ import ProfileSetup from "./pages/ProfileSetup";
 import Places from "./pages/Places";
 import AdManager from "./pages/AdManager";
 import Reels from "./pages/Reels";
+import People from "./pages/People";
+import Marketplace from "./pages/Marketplace";
+import Political from "./pages/Political";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -57,6 +60,9 @@ export default function App() {
         <Route path="/places" element={<Protected><Places /></Protected>} />
         <Route path="/ads" element={<Protected><AdManager /></Protected>} />
         <Route path="/reels" element={<Protected><Reels /></Protected>} />
+        <Route path="/people" element={<Protected><People /></Protected>} />
+        <Route path="/marketplace" element={<Protected><Marketplace /></Protected>} />
+        <Route path="/political" element={<Protected><Political /></Protected>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

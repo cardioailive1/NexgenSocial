@@ -38,6 +38,57 @@ hub scaffolded for the next build phase.
 - **Premium**: a `tier` field on `User` gates marketplace listings and ad
   creation server-side (not just hidden in the UI) — see `routes/premium.js`.
 
+### Marketplace (with real media)
+
+`frontend/src/pages/Marketplace.jsx`, `backend/src/routes/marketplace.js`.
+
+The original marketplace had a single `imageUrl` text field — unusable for
+the listings people actually post (a car, an apartment, furniture all need
+several angles, often a walkthrough video). Now: up to **10 photos and/or
+videos per listing**, uploaded directly, with a swipeable gallery and
+thumbnail strip. First photo becomes the cover. Plus condition, location,
+search, and ACTIVE/SOLD/WITHDRAWN status. Listings created before this
+still render via a fallback to the old `imageUrl` field.
+
+### Political Place
+
+`frontend/src/pages/Political.jsx`, `backend/src/routes/political.js`.
+
+Campaign / candidate / party / issue / organization pages, page posts,
+followers, and political ad placements.
+
+**Political ads are modelled separately from commercial ads, on purpose.**
+The legal obligations genuinely differ: the US FEC requires "paid for by"
+disclaimers on political advertising, and the EU's DSA and Political
+Advertising Regulation require disclosure *plus a public searchable
+archive*. Meta and Google both operate political ad libraries for exactly
+this reason. Three things follow from that, and they're structural rather
+than optional:
+
+1. **Every political page must name a responsible organization.** Enforced
+   at the API level, not just in the form — an anonymous political page is
+   precisely what disclosure rules exist to prevent, so it can't be
+   bypassed by posting directly to the endpoint.
+2. **"Paid for by" is a hard requirement on every ad.** The endpoint
+   rejects a blank value with a 400.
+3. **`GET /api/political/archive` is public and includes ended ads.** No
+   auth required. Ads staying inspectable *after* a campaign finishes is
+   the entire point — that's when there's most incentive for them to
+   disappear.
+
+Pages carry a `verified` flag (set by a platform admin after checking the
+organization is real). Unverified pages are shown with an explicit
+"Unverified" badge rather than being hidden or silently treated the same —
+readers can see the difference.
+
+**What this doesn't do:** there's no automated identity verification of
+advertisers, no per-jurisdiction rule engine (election law varies by
+country and often by state), and no spend limits or blackout-period
+enforcement. Those are real compliance requirements in some jurisdictions
+and would need legal input specific to where you operate. The disclosure
+and archive scaffolding is built; the jurisdiction-specific policy layer
+isn't, and shouldn't be guessed at.
+
 ### Reels — short-form video built for discovery
 
 `frontend/src/pages/Reels.jsx`, `frontend/src/components/ReelEditor.jsx`,

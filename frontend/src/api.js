@@ -29,6 +29,16 @@ export const api = {
       body: JSON.stringify(body || {}),
     }).then(handle),
 
+  // Was missing entirely -- the interests endpoint on the backend is a PUT
+  // (it replaces the whole set rather than patching it), so saving a profile
+  // threw "api.put is not a function" before this existed.
+  put: (path, body) =>
+    fetch(`${API_URL}${path}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify(body || {}),
+    }).then(handle),
+
   delete: (path) =>
     fetch(`${API_URL}${path}`, { method: "DELETE", headers: { ...authHeaders() } }).then(handle),
 
