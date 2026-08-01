@@ -128,6 +128,8 @@ function GroupDetail() {
   const [posts, setPosts] = useState([]);
   const [body, setBody] = useState("");
   const [postFiles, setPostFiles] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [showMembers, setShowMembers] = useState(false);
   const [joined, setJoined] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -138,8 +140,12 @@ function GroupDetail() {
       const { group } = await api.get(`/api/groups/${id}`);
       setGroup(group);
       setJoined((group.members || []).some((m) => m.user.username === user?.username));
-      const { posts } = await api.get(`/api/groups/${id}/posts`);
+      const [{ posts }, { members }] = await Promise.all([
+        api.get(`/api/groups/${id}/posts`),
+        api.get(`/api/groups/${id}/members`),
+      ]);
       setPosts(posts);
+      setMembers(members);
     } catch (err) {
       setError(err.message);
     }
@@ -187,9 +193,32 @@ function GroupDetail() {
       <div className="card" style={{ padding: 20, marginBottom: 20 }}>
         <h1 className="h-display" style={{ margin: 0, fontSize: 22 }}>{group.name}</h1>
         {group.description && <p style={{ color: "var(--slate-400)", marginTop: 6 }}>{group.description}</p>}
-        <div className="eyebrow" style={{ fontSize: 10, marginTop: 8 }}>
-          {group.members?.length ?? 0} members · by @{group.owner?.username}
-        </div>
+        <button onClick={() => setShowMembers((v) => !v)}
+          className="eyebrow"
+          style={{ fontSize: 10, marginTop: 8, color: "var(--cyan-300)", display: "block" }}>
+          {members.length} member{members.length === 1 ? "" : "s"} · by @{group.owner?.username} {showMembers ? "▲" : "▼"}
+        </button>
+
+        {showMembers && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+            {members.length === 0 && <p style={{ fontSize: 12, color: "var(--slate-400)" }}>No members yet.</p>}
+            {members.map((m) => (
+              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                <Link to={`/u/${m.username}`}>
+                  <img className="avatar" style={{ width: 30, height: 30 }}
+                    src={api.mediaUrl(m.avatarUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${m.username}`} alt="" />
+                </Link>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Link to={`/u/${m.username}`} style={{ fontWeight: 600, fontSize: 13 }}>{m.displayName}</Link>
+                  <div style={{ fontSize: 11, color: "var(--slate-400)" }}>@{m.username}</div>
+                </div>
+                {m.isOwner
+                  ? <span className="premium-pill">Owner</span>
+                  : m.role === "ADMIN" ? <span className="premium-pill">Admin</span> : null}
+              </div>
+            ))}
+          </div>
+        )}
         <button className={joined ? "btn btn-ghost" : "btn btn-primary"} style={{ marginTop: 12 }} onClick={toggleMembership} disabled={busy}>
           {busy ? "…" : joined ? "Leave group" : "Join group"}
         </button>

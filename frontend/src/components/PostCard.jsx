@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import { MediaGallery } from "./MediaAttach";
 
 function timeAgo(dateStr) {
   const diff = (Date.now() - new Date(dateStr).getTime()) / 1000;
@@ -134,12 +135,13 @@ export default function PostCard({ post, viewerUsername, onChanged }) {
             </div>
           )}
 
-          {post.mediaUrl && post.type === "VIDEO" && (
-            <video controls style={{ width: "100%", borderRadius: 10, marginTop: 8, border: "1px solid var(--line)" }} src={api.mediaUrl(post.mediaUrl)} />
-          )}
-          {post.mediaUrl && post.type === "IMAGE" && (
-            <img src={api.mediaUrl(post.mediaUrl)} alt="" style={{ width: "100%", borderRadius: 10, marginTop: 8, border: "1px solid var(--line)" }} />
-          )}
+          {/* Falls back to the legacy single mediaUrl for posts created
+              before multi-attachment support existed. */}
+          <MediaGallery
+            media={post.media}
+            legacyUrl={post.mediaUrl}
+            compact
+          />
 
           <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
             <button onClick={toggleLike} style={{ fontSize: 13, color: liked ? "var(--cyan-400)" : "var(--slate-300)", fontWeight: 600 }}>
