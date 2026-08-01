@@ -41,7 +41,7 @@ function ScoreRow({ event, broadcastUrl }) {
 export default function Sports() {
   const { user } = useAuth();
   const [leagues, setLeagues] = useState([]);
-  const [league, setLeague] = useState("soccer");
+  const [league, setLeague] = useState("");
   const [scores, setScores] = useState(null);
   const [scoresError, setScoresError] = useState("");
   const [posts, setPosts] = useState(null);
@@ -50,7 +50,12 @@ export default function Sports() {
   const [liveNow, setLiveNow] = useState([]);
 
   useEffect(() => {
-    api.get("/api/sports/leagues").then(({ leagues }) => setLeagues(leagues)).catch(() => {});
+    api.get("/api/sports/leagues").then(({ leagues }) => {
+      setLeagues(leagues);
+      // Pick the first league the API reports rather than hardcoding a key,
+      // which broke when the league list was reorganised.
+      if (leagues.length > 0) setLeague((cur) => cur || leagues[0].key);
+    }).catch(() => {});
     loadLive();
     // Refresh live scores while the page is open. Not true play-by-play --
     // the underlying free feed updates periodically, not per point.
@@ -75,7 +80,7 @@ export default function Sports() {
       setScoresError(err.message);
     }
   }
-  useEffect(() => { loadScores(); }, [league]);
+  useEffect(() => { if (league) loadScores(); }, [league]);
 
   async function loadPosts() {
     const { posts } = await api.get("/api/posts/explore?category=SPORTS");

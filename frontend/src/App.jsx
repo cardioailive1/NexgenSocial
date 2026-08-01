@@ -29,6 +29,7 @@ import Newsrooms from "./pages/Newsrooms";
 import NewsroomDetail from "./pages/NewsroomDetail";
 import Jobs from "./pages/Jobs";
 import Messages from "./pages/Messages";
+import Explore from "./pages/Explore";
 import CallRoom from "./pages/CallRoom";
 import IncomingCall from "./components/IncomingCall";
 import LegalDoc from "./pages/LegalDoc";
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="/newsrooms" element={<Protected><Newsrooms /></Protected>} />
         <Route path="/newsrooms/:slug" element={<Protected><NewsroomDetail /></Protected>} />
         <Route path="/jobs" element={<Protected><Jobs /></Protected>} />
+        <Route path="/explore" element={<Protected><Explore /></Protected>} />
         <Route path="/messages" element={<Protected><Messages /></Protected>} />
         <Route path="/call/:id" element={<Protected><CallRoom /></Protected>} />
         {/* Legal docs are intentionally NOT wrapped in <Protected> -- they
