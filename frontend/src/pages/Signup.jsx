@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
 import { POLICY_VERSION } from "../legal/documents";
+import PlatformHighlights from "../components/PlatformHighlights";
 import { useAuth } from "../AuthContext";
 import logo from "../assets/logo.jpg";
 
@@ -50,7 +51,9 @@ export default function Signup() {
   }
 
   return (
-    <div className="container" style={{ maxWidth: 420, paddingTop: 60 }}>
+    <div className="container" style={{ maxWidth: 920, paddingTop: 48, paddingBottom: 60 }}>
+      <div style={{ display: "flex", gap: 36, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div style={{ flex: "1 1 340px", minWidth: 300, maxWidth: 420 }}>
       <div style={{ textAlign: "center", marginBottom: 28 }}>
         <img src={logo} alt="Corverxis" style={{ width: 56, height: 56, borderRadius: 12, marginBottom: 14 }} />
         <h1 className="h-display" style={{ fontSize: 26, margin: 0 }}>Create your profile</h1>
@@ -91,6 +94,15 @@ export default function Signup() {
       <p style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "var(--slate-400)" }}>
         Already have an account? <Link to="/login" style={{ color: "var(--cyan-400)" }}>Sign in</Link>
       </p>
+      </div>
+
+      {/* Sits beside the form on wide screens and wraps beneath it on
+          narrow ones, so the form itself is always what's reachable first
+          on a phone. */}
+      <div style={{ flex: "1 1 320px", minWidth: 280, paddingTop: 8 }}>
+        <PlatformHighlights />
+      </div>
+      </div>
     </div>
   );
 }
