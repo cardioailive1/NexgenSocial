@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import PostCard from "../components/PostCard";
 import { useAuth } from "../AuthContext";
+import { MediaPicker } from "../components/MediaAttach";
 
 function GroupList() {
   const [groups, setGroups] = useState(null);
@@ -126,6 +127,7 @@ function GroupDetail() {
   const [group, setGroup] = useState(null);
   const [posts, setPosts] = useState([]);
   const [body, setBody] = useState("");
+  const [postFiles, setPostFiles] = useState([]);
   const [joined, setJoined] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -160,14 +162,18 @@ function GroupDetail() {
 
   async function postToGroup(e) {
     e.preventDefault();
-    if (!body.trim()) return;
+    if (!body.trim() && postFiles.length === 0) return;
     setError("");
     try {
       const formData = new FormData();
       formData.append("body", body);
       formData.append("groupId", id);
+      // The /api/posts endpoint always accepted media -- this composer just
+      // never offered it, so group posts were text-only.
+      postFiles.forEach((f) => formData.append("media", f));
       await api.upload("/api/posts", formData);
       setBody("");
+      setPostFiles([]);
       await load();
     } catch (err) {
       setError(err.message);
@@ -193,7 +199,10 @@ function GroupDetail() {
 
       <form onSubmit={postToGroup} className="card" style={{ padding: 16, marginBottom: 20 }}>
         <textarea placeholder={`Post in ${group.name}…`} rows={2} value={body} onChange={(e) => setBody(e.target.value)} />
-        <button className="btn btn-primary" type="submit" style={{ marginTop: 8 }}>Post</button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <MediaPicker files={postFiles} onChange={setPostFiles} max={10} />
+          <button className="btn btn-primary" type="submit">Post</button>
+        </div>
       </form>
 
       {posts.length === 0 && (

@@ -28,6 +28,9 @@ import Political from "./pages/Political";
 import Newsrooms from "./pages/Newsrooms";
 import NewsroomDetail from "./pages/NewsroomDetail";
 import Jobs from "./pages/Jobs";
+import Messages from "./pages/Messages";
+import CallRoom from "./pages/CallRoom";
+import IncomingCall from "./components/IncomingCall";
 import LegalDoc from "./pages/LegalDoc";
 
 function Protected({ children }) {
@@ -42,6 +45,7 @@ export default function App() {
   return (
     <>
       <Navbar />
+      <IncomingCall />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
@@ -70,6 +74,8 @@ export default function App() {
         <Route path="/newsrooms" element={<Protected><Newsrooms /></Protected>} />
         <Route path="/newsrooms/:slug" element={<Protected><NewsroomDetail /></Protected>} />
         <Route path="/jobs" element={<Protected><Jobs /></Protected>} />
+        <Route path="/messages" element={<Protected><Messages /></Protected>} />
+        <Route path="/call/:id" element={<Protected><CallRoom /></Protected>} />
         {/* Legal docs are intentionally NOT wrapped in <Protected> -- they
             must be readable before signing up, since acceptance is required
             to create an account in the first place. */}

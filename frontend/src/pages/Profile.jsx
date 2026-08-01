@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, API_URL } from "../api";
 import { useAuth } from "../AuthContext";
 import PostCard from "../components/PostCard";
@@ -7,6 +7,7 @@ import PostCard from "../components/PostCard";
 export default function Profile() {
   const { username } = useParams();
   const { user: viewer } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [posts, setPosts] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -60,6 +61,18 @@ export default function Profile() {
     } finally {
       setUploadingAvatar(false);
       if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  }
+
+  async function callUser(kind = "AUDIO") {
+    setBusy(true);
+    try {
+      const { call } = await api.post("/api/messages/calls", { username, kind });
+      navigate(`/call/${call.id}`);
+    } catch (err) {
+      setAvatarError(err.message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -124,6 +137,12 @@ export default function Profile() {
               <button className="btn btn-primary" onClick={toggleFollow} disabled={busy}>
                 {viewerContext.isFollowing ? "Unfollow" : "Follow"}
               </button>
+              {/* There was previously no way to contact someone from their
+                  profile at all -- you could follow or friend them and then
+                  had nowhere to go. */}
+              <Link className="btn btn-ghost" to={`/messages?with=${user.username}`}>💬 Message</Link>
+              <button className="btn btn-ghost" onClick={() => callUser("AUDIO")} disabled={busy}>📞 Call</button>
+              <button className="btn btn-ghost" onClick={() => callUser("VIDEO")} disabled={busy}>🎥 Video</button>
               {viewerContext.friendStatus === "NONE" && (
                 <button className="btn btn-ghost" onClick={sendFriendRequest} disabled={busy}>Add friend</button>
               )}

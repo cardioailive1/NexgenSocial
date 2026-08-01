@@ -38,6 +38,48 @@ hub scaffolded for the next build phase.
 - **Premium**: a `tier` field on `User` gates marketplace listings and ad
   creation server-side (not just hidden in the UI) — see `routes/premium.js`.
 
+### Direct messages & in-app calls
+
+`frontend/src/pages/Messages.jsx`, `CallRoom.jsx`,
+`components/IncomingCall.jsx`, `backend/src/routes/messages.js`.
+
+1:1 conversations with photo/video attachments, unread counts, and a
+Message button on every profile. Calls (voice or video) run over the same
+mediasoup SFU that powers live streaming, using the call id as the room id
+— both parties join as publishers, since a call is symmetric unlike a
+broadcast. An incoming-call banner appears anywhere in the app.
+
+Conversations are created server-side via find-or-create, which avoids the
+common bug where two people message each other simultaneously and end up
+in two separate threads.
+
+Message delivery and call ringing use short polling rather than a
+persistent WebSocket. That's a deliberate trade for now: a socket per
+signed-in user is real memory on a single small instance, and polling every
+4–5 seconds is adequate at current scale. Moving to WebSocket push is the
+natural upgrade once concurrency justifies it.
+
+### Calling real phone numbers (not built — and why)
+
+The app can call **NexgenSocial users**, anywhere with internet. It cannot
+dial **telephone numbers**, and that gap is not something more code fixes.
+
+Placing a call to the PSTN (the actual phone network) requires:
+- A carrier relationship or a CPaaS provider account — Twilio, Vonage,
+  Telnyx or similar — with per-minute billing you'd fund.
+- Provisioned phone numbers, purchased per number per month.
+- Regulatory registration in most countries. In the US that includes
+  A2P 10DLC registration for SMS and STIR/SHAKEN attestation for voice;
+  many other countries require a local entity or licence.
+- Emergency-calling obligations in some jurisdictions, which carry real
+  legal weight and are not optional.
+
+None of that is a coding problem, which is why it isn't stubbed out here
+pretending to work. The seam to add it: a provider's server SDK would sit
+alongside `routes/messages.js`, and `Call` would gain a `phoneNumber` field
+plus a provider call id. Everything else — call records, status
+transitions, history — already generalises.
+
 ### Jobs
 
 `frontend/src/pages/Jobs.jsx`, `backend/src/routes/jobs.js`.
