@@ -211,16 +211,42 @@ export default function CallRoom() {
   // Ringback for the caller: a repeating tone while waiting for an answer,
   // so an unanswered call sounds like an unanswered call rather than a
   // silent frozen screen. Stops the moment the status changes to Connected.
+  // Created up front and unlocked on the first user gesture, rather than
+  // built on demand when ringing starts. Constructing an AudioContext at
+  // ring time is exactly what triggers "An AudioContext was prevented from
+  // starting automatically" -- by then there may have been no gesture on
+  // this page, and the context is born suspended and stays that way.
+  const ringbackCtxRef = useRef(null);
+
+  useEffect(() => {
+    function unlock() {
+      try {
+        if (!ringbackCtxRef.current) {
+          ringbackCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (ringbackCtxRef.current.state === "suspended") {
+          ringbackCtxRef.current.resume().catch(() => {});
+        }
+      } catch { /* silent ringback is survivable */ }
+    }
+    const events = ["click", "keydown", "touchstart"];
+    events.forEach((e) => window.addEventListener(e, unlock));
+    unlock();
+    return () => events.forEach((e) => window.removeEventListener(e, unlock));
+  }, []);
+
   useEffect(() => {
     if (status !== "Ringing…") return;
-    let ctx;
     let stopped = false;
 
     function tone() {
       if (stopped) return;
+      const ctx = ringbackCtxRef.current;
+      // No context yet, or still suspended, means no gesture has happened
+      // on this page. Skip quietly instead of constructing one and
+      // generating a console warning on every tick.
+      if (!ctx || ctx.state !== "running") return;
       try {
-        ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
-        if (ctx.state === "suspended") { ctx.resume().catch(() => {}); return; }
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.frequency.value = 420;
@@ -236,7 +262,7 @@ export default function CallRoom() {
 
     tone();
     const t = setInterval(tone, 3000);
-    return () => { stopped = true; clearInterval(t); ctx?.close?.(); };
+    return () => { stopped = true; clearInterval(t); };
   }, [status]);
 
   // Runs after the video element is mounted, which is the only point at
