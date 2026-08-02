@@ -208,6 +208,37 @@ export default function CallRoom() {
     };
   }, [id]);
 
+  // Ringback for the caller: a repeating tone while waiting for an answer,
+  // so an unanswered call sounds like an unanswered call rather than a
+  // silent frozen screen. Stops the moment the status changes to Connected.
+  useEffect(() => {
+    if (status !== "Ringing…") return;
+    let ctx;
+    let stopped = false;
+
+    function tone() {
+      if (stopped) return;
+      try {
+        ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+        if (ctx.state === "suspended") { ctx.resume().catch(() => {}); return; }
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 420;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.0);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 1.05);
+      } catch { /* silent ringback is survivable */ }
+    }
+
+    tone();
+    const t = setInterval(tone, 3000);
+    return () => { stopped = true; clearInterval(t); ctx?.close?.(); };
+  }, [status]);
+
   // Runs after the video element is mounted, which is the only point at
   // which the ref is non-null.
   useEffect(() => {
@@ -282,7 +313,14 @@ export default function CallRoom() {
       <img className="avatar" style={{ width: 88, height: 88, margin: "0 auto 14px" }}
         src={api.mediaUrl(other?.avatarUrl) || `https://api.dicebear.com/7.x/identicon/svg?seed=${other?.username || "call"}`} alt="" />
       <h1 className="h-display" style={{ fontSize: 22, margin: 0 }}>{other?.displayName || "Call"}</h1>
-      <p style={{ color: "var(--slate-400)", fontSize: 13, marginTop: 4 }}>{status} · {mmss}</p>
+      <p style={{ color: status === "Ringing…" ? "var(--cyan-300)" : "var(--slate-400)", fontSize: 13, marginTop: 4 }}>
+        {status} · {mmss}
+      </p>
+      {status === "Ringing…" && (
+        <p style={{ fontSize: 11.5, color: "var(--slate-400)", marginTop: 2 }}>
+          They'll only see this if they have NexgenSocial open in a browser tab.
+        </p>
+      )}
 
       {(hasVideo || remoteHasVideo) && (
         <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "center", flexWrap: "wrap" }}>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { api } from "../api";
 import { useAuth } from "../AuthContext";
@@ -38,33 +38,86 @@ export default function IncomingCall() {
   // two-tone ring with the Web Audio API rather than shipping an audio
   // file -- no asset, no autoplay-policy issue once the user has
   // interacted with the page.
+  // Browsers create AudioContexts in a "suspended" state and only allow
+  // sound after the user has interacted with the page. The previous
+  // version built a context on demand when a call arrived -- by which
+  // point there may have been no interaction, so it stayed suspended and
+  // the ring was silent (confirmed: audio state was "suspended").
+  //
+  // Fix: create the context once, up front, and resume it on the first
+  // click/keypress/touch anywhere in the app. By the time a call arrives
+  // it's already unblocked.
+  const audioCtxRef = useRef(null);
+
+  useEffect(() => {
+    function unlock() {
+      try {
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtxRef.current.state === "suspended") {
+          audioCtxRef.current.resume();
+        }
+      } catch { /* audio unavailable; the visual banner still works */ }
+    }
+
+    // `once` isn't used because a resume can fail on the very first
+    // gesture in some browsers; listening until it actually succeeds is
+    // more reliable.
+    const events = ["click", "keydown", "touchstart"];
+    events.forEach((e) => window.addEventListener(e, unlock));
+    unlock(); // harmless if it's still blocked; succeeds if already allowed
+    return () => events.forEach((e) => window.removeEventListener(e, unlock));
+  }, []);
+
   useEffect(() => {
     if (!call) return;
-    let ctx;
     let stopped = false;
 
     function ring() {
       if (stopped) return;
+      const ctx = audioCtxRef.current;
+      if (!ctx) return;
+      // Still suspended means the person hasn't interacted with the page
+      // yet. Try once more rather than giving up silently.
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+        return;
+      }
       try {
-        ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
         [0, 0.4].forEach((offset) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.frequency.value = offset === 0 ? 480 : 620;
           gain.gain.setValueAtTime(0.0001, ctx.currentTime + offset);
-          gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + offset + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + offset + 0.02);
           gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + offset + 0.35);
           osc.connect(gain);
           gain.connect(ctx.destination);
           osc.start(ctx.currentTime + offset);
           osc.stop(ctx.currentTime + offset + 0.36);
         });
-      } catch { /* audio blocked; the banner still shows */ }
+      } catch { /* the banner still shows */ }
     }
 
     ring();
     const t = setInterval(ring, 2500);
-    return () => { stopped = true; clearInterval(t); ctx?.close?.(); };
+
+    // Also flash the tab title, which is visible even when the tab is in
+    // the background and doesn't depend on audio being unblocked at all.
+    const originalTitle = document.title;
+    let flip = false;
+    const titleTimer = setInterval(() => {
+      flip = !flip;
+      document.title = flip ? `📞 ${call.caller.displayName} is calling…` : originalTitle;
+    }, 1000);
+
+    return () => {
+      stopped = true;
+      clearInterval(t);
+      clearInterval(titleTimer);
+      document.title = originalTitle;
+    };
   }, [call]);
 
   if (!call) return null;
