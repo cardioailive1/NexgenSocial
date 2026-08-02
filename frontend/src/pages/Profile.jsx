@@ -17,9 +17,9 @@ export default function Profile() {
   const isMe = viewer?.username === username;
 
   async function load() {
-    const profile = await api.get(`/api/users/${username}`);
+    const profile = await api.get(`/api/users/${encodeURIComponent(username)}`);
     setData(profile);
-    const { posts } = await api.get(`/api/posts/by/${username}`);
+    const { posts } = await api.get(`/api/posts/by/${encodeURIComponent(username)}`);
     setPosts(posts);
   }
 
@@ -28,8 +28,8 @@ export default function Profile() {
   async function toggleFollow() {
     setBusy(true);
     try {
-      if (data.viewerContext.isFollowing) await api.delete(`/api/follows/${username}`);
-      else await api.post(`/api/follows/${username}`);
+      if (data.viewerContext.isFollowing) await api.delete(`/api/follows/${encodeURIComponent(username)}`);
+      else await api.post(`/api/follows/${encodeURIComponent(username)}`);
       await load();
     } finally {
       setBusy(false);

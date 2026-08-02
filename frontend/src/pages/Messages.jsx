@@ -52,7 +52,7 @@ export default function Messages() {
       // thread straight away, rather than making them hunt for it.
       if (withUser) {
         try {
-          const { conversation } = await api.post(`/api/messages/with/${withUser}`);
+          const { conversation } = await api.post(`/api/messages/with/${encodeURIComponent(withUser)}`);
           await loadConversations();
           openConversation(conversation.id, conversation.otherUser);
           setSearchParams({});

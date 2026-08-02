@@ -31,8 +31,8 @@ export default function People() {
     setBusyId(user.id);
     setError("");
     try {
-      if (action === "follow") await api.post(`/api/follows/${user.username}`);
-      if (action === "unfollow") await api.delete(`/api/follows/${user.username}`);
+      if (action === "follow") await api.post(`/api/follows/${encodeURIComponent(user.username)}`);
+      if (action === "unfollow") await api.delete(`/api/follows/${encodeURIComponent(user.username)}`);
       if (action === "friend") await api.post("/api/friends/requests", { username: user.username });
       if (action === "accept") await api.patch(`/api/friends/requests/${user.friendRequestId}`, { action: "accept" });
       if (action === "cancel") await api.delete(`/api/friends/requests/${user.friendRequestId}`);

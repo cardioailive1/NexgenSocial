@@ -107,6 +107,7 @@ export default function CallRoom() {
         });
 
         ws.onopen = async () => {
+        try {
           // Both sides join as "host" so each can publish -- a call is
           // symmetric, unlike a broadcast where only one side sends.
           const { rtpCapabilities, existingProducers } = await signaling.request("join", {
@@ -151,9 +152,28 @@ export default function CallRoom() {
             await api.patch(`/api/messages/calls/${id}`, { status: "ACTIVE" }).catch(() => {});
           }
           setStatus(iAmCallee ? "Connected" : "Ringing…");
+        } catch (err) {
+          // Previously this threw into nothing: an async handler's
+          // rejection is unhandled, so a mediasoup or signalling failure
+          // showed up only as the generic onerror message below, with the
+          // real cause invisible.
+          console.error("[call] setup failed:", err);
+          setError(`Call setup failed: ${err?.message || err}`);
+        }
         };
 
-        ws.onerror = () => setError("Couldn't reach the call server.");
+        ws.onerror = (e) => {
+          console.error("[call] websocket error:", e);
+          setError("Lost connection to the call server.");
+        };
+
+        ws.onclose = (e) => {
+          // 1000/1005 are normal closes (hanging up, navigating away) and
+          // must not be reported as failures.
+          if (e.code !== 1000 && e.code !== 1005) {
+            console.warn("[call] websocket closed unexpectedly:", e.code, e.reason);
+          }
+        };
       } catch (err) {
         setError(err.message);
       }

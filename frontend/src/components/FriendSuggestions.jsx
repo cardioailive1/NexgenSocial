@@ -22,7 +22,7 @@ export default function FriendSuggestions({ limit = 5, compact = false }) {
   async function follow(user) {
     setBusyId(user.id);
     try {
-      await api.post(`/api/follows/${user.username}`);
+      await api.post(`/api/follows/${encodeURIComponent(user.username)}`);
       setHidden((h) => [...h, user.id]);
     } catch { /* surfaced by the list refreshing unchanged */ }
     finally { setBusyId(null); }
