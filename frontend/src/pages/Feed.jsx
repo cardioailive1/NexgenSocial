@@ -3,6 +3,8 @@ import { api } from "../api";
 import PostCard from "../components/PostCard";
 import QuickVideoRecorder from "../components/QuickVideoRecorder";
 import SponsoredCard from "../components/SponsoredCard";
+import ProfileAlert from "../components/ProfileAlert";
+import FriendSuggestions from "../components/FriendSuggestions";
 import { useAuth } from "../AuthContext";
 
 const DEFAULT_WEIGHTS = { recency: 0.5, engagement: 0.3, diversity: 0.2 };
@@ -81,6 +83,9 @@ export default function Feed() {
 
   return (
     <div className="container" style={{ maxWidth: 640, paddingTop: 28, paddingBottom: 60 }}>
+      <ProfileAlert />
+      <FriendSuggestions limit={4} />
+
       <div className="card" style={{ padding: 12, marginBottom: 20 }}>
         <button onClick={() => setShowTuning((v) => !v)} style={{ fontSize: 12, fontWeight: 600, color: "var(--cyan-300)", width: "100%", textAlign: "left" }}>
           ⚙ Tune my feed algorithm {showTuning ? "▲" : "▼"}

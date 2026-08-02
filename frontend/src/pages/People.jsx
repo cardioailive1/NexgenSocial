@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import FriendSuggestions from "../components/FriendSuggestions";
 
 export default function People() {
   const [users, setUsers] = useState(null);
@@ -88,6 +89,8 @@ export default function People() {
         to accept — you can track them on your{" "}
         <Link to="/friends" style={{ color: "var(--cyan-300)" }}>Friends</Link> page.
       </p>
+
+      <FriendSuggestions limit={5} />
 
       <input
         type="text"
