@@ -80,6 +80,56 @@ alongside `routes/messages.js`, and `Call` would gain a `phoneNumber` field
 plus a provider call id. Everything else — call records, status
 transitions, history — already generalises.
 
+### Advertising payments
+
+Ads use a **fixed starter package**: $50 buys one day and roughly 1,000
+people. Everyone starts there -- the advertiser doesn't choose a budget up
+front. Once a campaign is running it can be **extended for any amount**,
+which adds days and reach in proportion ($25 adds ~half a day and ~500
+people). Keeping entry price fixed makes the offer easy to understand and
+lets someone test cheaply before committing.
+
+**The reach cap is enforced, not decorative.** `adsTargeting.js` counts
+*distinct* users who have seen each ad and stops serving it to new people
+once the cap is hit. Counting distinct viewers rather than raw impressions
+matters -- otherwise one person refreshing would burn the whole campaign.
+Someone who has already seen an ad keeps seeing it, so the cap limits
+audience size rather than frequency.
+
+**Payment flow** (`backend/src/routes/premium.js`):
+1. Ad is created in `PENDING_PAYMENT` and does **not** serve. This is
+   enforced in the serving query, so calling the API directly won't bypass it.
+2. `POST /ads/:id/checkout` creates a Stripe Checkout Session for the exact
+   amount, with the ad id in metadata.
+3. Stripe redirects the advertiser back, and separately calls
+   `POST /api/premium/stripe-webhook`.
+4. The webhook verifies the signature against `STRIPE_WEBHOOK_SECRET`, then
+   activates the campaign. **This is the only path that marks an ad paid**
+   when Stripe is configured -- the manual confirm endpoint disables itself
+   automatically, otherwise an advertiser could activate their own ad free.
+
+Two details that exist to prevent paying less than you get:
+- Reach is granted on `session.amount_total` (what Stripe actually
+  collected), never on the requested budget.
+- The webhook route is mounted with `express.raw()` **before**
+  `express.json()` in `index.js`. Stripe verifies signatures against the
+  exact bytes it sent, and a parsed body fails verification every time.
+
+**Setup:**
+```bash
+fly secrets set STRIPE_SECRET_KEY="sk_test_..." -a <your-app>
+```
+Then in the Stripe dashboard create a webhook pointing at
+`https://<your-api>/api/premium/stripe-webhook`, subscribed to
+`checkout.session.completed`, and set the signing secret:
+```bash
+fly secrets set STRIPE_WEBHOOK_SECRET="whsec_..." -a <your-app>
+```
+Start with test keys and Stripe's test cards. Without
+`STRIPE_WEBHOOK_SECRET` the webhook returns 503 and no ad will ever
+activate -- that's deliberate, since an unverified webhook is not proof of
+payment.
+
 ### Jobs
 
 `frontend/src/pages/Jobs.jsx`, `backend/src/routes/jobs.js`.

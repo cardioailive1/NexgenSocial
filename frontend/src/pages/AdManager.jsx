@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { MediaPicker, MediaGallery } from "../components/MediaAttach";
 
 const RELATIONSHIP_OPTIONS = ["SINGLE", "IN_RELATIONSHIP", "ENGAGED", "MARRIED", "DIVORCED", "WIDOWED"];
 const GENDER_OPTIONS = ["Woman", "Man", "Non-binary", "Other"];
@@ -16,10 +17,19 @@ export default function AdManager() {
   const [insights, setInsights] = useState({});
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [adMedia, setAdMedia] = useState([]);
+  const [extendAmount, setExtendAmount] = useState({});
+  const [pricing, setPricing] = useState(null);
+  const [createdAd, setCreatedAd] = useState(null);
+  const [paymentRef, setPaymentRef] = useState("");
 
   useEffect(() => {
     api.get("/api/profile/interests").then(({ interests }) => setInterests(interests)).catch(() => {});
     loadMyAds();
+  }, []);
+
+  useEffect(() => {
+    api.get("/api/ads/pricing").then(setPricing).catch(() => {});
   }, []);
 
   async function loadMyAds() {
@@ -78,13 +88,17 @@ export default function AdManager() {
     setCreating(true);
     setError("");
     try {
-      await api.post("/api/premium/ads", {
-        headline: form.headline,
-        body: form.body,
-        targetUrl: form.targetUrl || null,
-        category: form.category,
-      });
+      const fd = new FormData();
+      fd.append("headline", form.headline);
+      fd.append("body", form.body);
+      fd.append("category", form.category);
+      if (form.targetUrl) fd.append("targetUrl", form.targetUrl);
+      adMedia.forEach((f) => fd.append("media", f));
+
+      const res = await api.upload("/api/premium/ads", fd);
+      setCreatedAd(res.ad);
       setForm((f) => ({ ...f, headline: "", body: "", targetUrl: "" }));
+      setAdMedia([]);
       await loadMyAds();
     } catch (err) {
       setError(err.message);
@@ -195,8 +209,36 @@ export default function AdManager() {
           <option value="POLITICAL">Political</option>
           <option value="GENERAL">General</option>
         </select>
+
+        <MediaPicker files={adMedia} onChange={setAdMedia} max={5} label="🎬 Ad photos & video" />
+
+        <div style={{ padding: 12, background: "var(--navy-950)", border: "1px solid var(--line)", borderRadius: 10 }}>
+          <div className="eyebrow" style={{ fontSize: 10, marginBottom: 8 }}>What $50 gets you</div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12.5, color: "var(--slate-300)" }}>
+            <div>
+              <div className="h-display" style={{ fontSize: 20, color: "var(--cyan-300)" }}>
+                ${((pricing?.starter?.priceCents ?? 5000) / 100).toFixed(2)}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--slate-400)" }}>one-off</div>
+            </div>
+            <div>
+              <div className="h-display" style={{ fontSize: 20 }}>{pricing?.starter?.durationDays ?? 1} day</div>
+              <div style={{ fontSize: 11, color: "var(--slate-400)" }}>runtime</div>
+            </div>
+            <div>
+              <div className="h-display" style={{ fontSize: 20 }}>
+                {(pricing?.starter?.reachCap ?? 1000).toLocaleString()}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--slate-400)" }}>people reached</div>
+            </div>
+          </div>
+          <p style={{ fontSize: 11, color: "var(--slate-400)", marginTop: 10, marginBottom: 0, lineHeight: 1.5 }}>
+            Every campaign starts here. Once it's running you can extend it for
+            any amount — more days and more people, in proportion to what you add.
+          </p>
+        </div>
         <button className="btn btn-primary" type="submit" disabled={creating} style={{ justifySelf: "start" }}>
-          {creating ? "Creating…" : "Create ad"}
+          {creating ? "Creating…" : `Create ad — $${((pricing?.starter?.priceCents ?? 5000) / 100).toFixed(2)}`}
         </button>
         <p style={{ fontSize: 11, color: "var(--slate-400)", margin: 0 }}>
           Note: the targeting criteria above are applied when serving ads, but
@@ -206,18 +248,80 @@ export default function AdManager() {
         </p>
       </form>
 
+      {createdAd && createdAd.paymentStatus !== "PAID" && (
+        <div className="card" style={{ padding: 16, marginBottom: 16, borderColor: "var(--cyan-400)" }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>One step left — pay to start your ad</div>
+          <p style={{ fontSize: 12.5, color: "var(--slate-300)", lineHeight: 1.6, marginTop: 0 }}>
+            "{createdAd.headline}" is saved but <strong>will not run until payment is confirmed</strong>.
+            Pay <strong style={{ color: "var(--cyan-300)" }}>${(createdAd.budgetCents / 100).toFixed(2)}</strong> for
+            a {createdAd.durationDays}-day campaign, then paste the reference from your receipt below.
+          </p>
+
+          <button className="btn btn-primary" onClick={async () => {
+            try {
+              const res = await api.post(`/api/premium/ads/${createdAd.id}/checkout`, {});
+              if (res.checkoutUrl) window.location.href = res.checkoutUrl;
+            } catch (err) {
+              // Falls back to the plain payment link if Checkout isn't
+              // available, so the flow still works either way.
+              if (pricing?.paymentUrl) window.open(pricing.paymentUrl, "_blank", "noopener");
+              else setError(err.message);
+            }
+          }}>
+            Pay ${((createdAd.budgetCents ?? 5000) / 100).toFixed(2)} with Stripe ↗
+          </button>
+
+          <p style={{ fontSize: 11, color: "var(--slate-400)", marginTop: 10, lineHeight: 1.5 }}>
+            Your ad starts automatically once payment completes.
+          </p>
+        </div>
+      )}
+
       <h2 className="eyebrow" style={{ marginBottom: 10 }}>Your ads ({myAds.length})</h2>
       {myAds.length === 0 && <p style={{ color: "var(--slate-400)", fontSize: 13 }}>No ads yet.</p>}
       {myAds.map((ad) => (
         <div key={ad.id} className="card" style={{ padding: 14, marginBottom: 10 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{ad.headline}</div>
-              <div style={{ fontSize: 12, color: "var(--slate-400)" }}>{ad.category}</div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{ad.headline}</span>
+                {ad.paymentStatus === "PAID"
+                  ? <span className="premium-pill">Running</span>
+                  : <span className="premium-pill" style={{ background: "rgba(255,107,107,0.12)", color: "var(--danger)", borderColor: "rgba(255,107,107,0.3)" }}>Awaiting payment</span>}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--slate-400)" }}>
+                {ad.category}
+                {ad.budgetCents ? ` · $${(ad.budgetCents / 100).toFixed(2)}` : ""}
+                {ad.durationDays ? ` · ${ad.durationDays} days` : ""}
+              </div>
+              {ad.media?.length > 0 && <MediaGallery media={ad.media} compact />}
             </div>
-            <button className="btn btn-ghost" onClick={() => loadInsights(ad.id)} style={{ fontSize: 11, padding: "6px 10px" }}>
-              View performance
-            </button>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button className="btn btn-ghost" onClick={() => loadInsights(ad.id)} style={{ fontSize: 11, padding: "6px 10px" }}>
+                View performance
+              </button>
+              {ad.paymentStatus === "PAID" && (
+                <>
+                  <input type="number" min={5} placeholder="$"
+                    value={extendAmount[ad.id] || ""}
+                    onChange={(e) => setExtendAmount((s) => ({ ...s, [ad.id]: e.target.value }))}
+                    style={{ width: 80, fontSize: 11, padding: "5px 8px" }} />
+                  <button className="btn btn-primary" style={{ fontSize: 11, padding: "6px 10px" }}
+                    onClick={async () => {
+                      const amt = Number(extendAmount[ad.id]);
+                      if (!amt || amt < 5) { setError("The minimum top-up is $5."); return; }
+                      try {
+                        const res = await api.post(`/api/premium/ads/${ad.id}/extend/checkout`, {
+                          topUpCents: Math.round(amt * 100),
+                        });
+                        if (res.checkoutUrl) window.location.href = res.checkoutUrl;
+                      } catch (err) { setError(err.message); }
+                    }}>
+                    Extend
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {insights[ad.id] && (
