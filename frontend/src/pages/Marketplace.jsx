@@ -19,10 +19,16 @@ function MediaGallery({ media, coverUrl }) {
       <div style={{ position: "relative" }}>
         {current.kind === "VIDEO" ? (
           <video src={api.mediaUrl(current.url)} controls
-            style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 10, background: "#000" }} />
+            style={{ width: "100%", aspectRatio: "4/3", objectFit: "contain", borderRadius: 10, background: "#000" }} />
         ) : (
           <img src={api.mediaUrl(current.url)} alt=""
-            style={{ width: "100%", aspectRatio: "4/3", objectFit: "cover", borderRadius: 10 }} />
+            style={{
+              width: "100%", aspectRatio: "4/3",
+              // contain, not cover: a portrait photo of an item was being
+              // cropped top and bottom, hiding part of what's for sale.
+              objectFit: "contain", background: "var(--navy-950)",
+              borderRadius: 10,
+            }} />
         )}
         {items.length > 1 && (
           <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(6,15,28,0.85)", borderRadius: 999, padding: "3px 9px", fontSize: 11, color: "var(--slate-300)" }}>

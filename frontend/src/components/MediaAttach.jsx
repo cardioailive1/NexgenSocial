@@ -58,6 +58,7 @@ export function MediaPicker({ files, onChange, max = 10, label = "📷 Add photo
 // Displays saved media with a gallery and per-item download links.
 export function MediaGallery({ media, legacyUrl, compact = false }) {
   const [index, setIndex] = useState(0);
+  const [lightbox, setLightbox] = useState(null);
   const items = media?.length
     ? [...media].sort((a, b) => a.position - b.position)
     : legacyUrl
@@ -73,10 +74,27 @@ export function MediaGallery({ media, legacyUrl, compact = false }) {
       <div style={{ position: "relative" }}>
         {current.kind === "VIDEO" ? (
           <video src={api.mediaUrl(current.url)} controls
-            style={{ width: "100%", borderRadius: 10, background: "#000", maxHeight: maxH, border: "1px solid var(--line)" }} />
+            style={{ width: "100%", borderRadius: 10, background: "#000", maxHeight: maxH, objectFit: "contain", border: "1px solid var(--line)" }} />
         ) : (
-          <img src={api.mediaUrl(current.url)} alt={current.caption || ""}
-            style={{ width: "100%", borderRadius: 10, maxHeight: maxH, objectFit: "cover", border: "1px solid var(--line)" }} />
+          <img
+            src={api.mediaUrl(current.url)}
+            alt={current.caption || ""}
+            onClick={() => setLightbox(current)}
+            style={{
+              width: "100%", borderRadius: 10, maxHeight: maxH,
+              // "contain" not "cover": cover crops anything whose aspect
+              // ratio doesn't match the box, which chopped the top and
+              // bottom off portrait photos. contain scales the whole image
+              // to fit, so nothing is lost.
+              objectFit: "contain",
+              // A dark backdrop so letterboxing reads as intentional
+              // rather than looking like a rendering fault.
+              background: "var(--navy-950)",
+              border: "1px solid var(--line)",
+              cursor: "zoom-in",
+              display: "block",
+            }}
+          />
         )}
         {items.length > 1 && (
           <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(6,15,28,0.85)", borderRadius: 999, padding: "3px 9px", fontSize: 11, color: "var(--slate-300)" }}>
@@ -107,13 +125,61 @@ export function MediaGallery({ media, legacyUrl, compact = false }) {
           </div>
         ) : <span />}
 
-        {/* Explicit download link -- viewing in-page and saving a copy are
-            different needs, especially for press images and ad creative. */}
-        <a href={api.mediaUrl(current.url)} download target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 11, color: "var(--cyan-300)", whiteSpace: "nowrap" }}>
-          ⤓ Download {current.kind === "VIDEO" ? "video" : "photo"}
-        </a>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {current.kind !== "VIDEO" && (
+            <button type="button" onClick={() => setLightbox(current)}
+              style={{ fontSize: 11, color: "var(--cyan-300)", whiteSpace: "nowrap" }}>
+              ⛶ View full size
+            </button>
+          )}
+          {/* Explicit download link -- viewing in-page and saving a copy are
+              different needs, especially for press images and ad creative. */}
+          <a href={api.mediaUrl(current.url)} download target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 11, color: "var(--cyan-300)", whiteSpace: "nowrap" }}>
+            ⤓ Download {current.kind === "VIDEO" ? "video" : "photo"}
+          </a>
+        </div>
       </div>
+
+      {/* Full-size overlay. The inline view is deliberately height-capped so
+          one tall photo doesn't push everything else off screen; this is
+          how you see the whole thing at full resolution. */}
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(3, 8, 15, 0.94)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20, cursor: "zoom-out",
+          }}
+        >
+          <img
+            src={api.mediaUrl(lightbox.url)}
+            alt={lightbox.caption || ""}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 8, cursor: "default" }}
+          />
+          <button
+            onClick={() => setLightbox(null)}
+            style={{
+              position: "absolute", top: 16, right: 20, fontSize: 26,
+              color: "var(--white)", lineHeight: 1,
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+          {lightbox.caption && (
+            <div style={{
+              position: "absolute", bottom: 20, left: 0, right: 0, textAlign: "center",
+              fontSize: 12, color: "var(--slate-300)", padding: "0 20px",
+            }}>
+              {lightbox.caption}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
