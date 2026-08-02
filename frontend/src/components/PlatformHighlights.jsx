@@ -24,6 +24,11 @@ const HIGHLIGHTS = [
     body: "Talk to anyone on NexgenSocial from anywhere with an internet connection — no phone plan needed.",
   },
   {
+    icon: "🎥",
+    title: "NexgenMeet",
+    body: "Host video meetings with waiting rooms, screen sharing and chat. Invite friends or a whole group. Recordings stay private until you choose to publish or download them.",
+  },
+  {
     icon: "🛍",
     title: "Marketplace and jobs",
     body: "Buy and sell with real photo and video listings, or find work — with salary ranges shown up front, not hidden.",

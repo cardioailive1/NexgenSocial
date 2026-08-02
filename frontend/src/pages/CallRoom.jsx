@@ -16,6 +16,13 @@ export default function CallRoom() {
   const [muted, setMuted] = useState(false);
   const [cameraOff, setCameraOff] = useState(false);
   const [hasVideo, setHasVideo] = useState(false);
+  // Tracked separately from our own camera: the video area must exist as
+  // soon as EITHER side is sending video. Previously it was gated on our
+  // own camera alone, so if they enabled video and we hadn't, the <video>
+  // element didn't exist, the ref was null, and their stream was dropped --
+  // which looked like a permanently black screen.
+  const [remoteHasVideo, setRemoteHasVideo] = useState(false);
+  const pendingRemoteStreamRef = useRef(null);
   const [call, setCall] = useState(null);
   const [seconds, setSeconds] = useState(0);
 
@@ -132,12 +139,18 @@ export default function CallRoom() {
       await signaling.request("resumeConsumer", { consumerId: consumer.id });
 
       const stream = new MediaStream([consumer.track]);
-      if (consumer.kind === "audio" && remoteAudioRef.current) {
-        remoteAudioRef.current.srcObject = stream;
-        remoteAudioRef.current.play().catch(() => {});
-      } else if (consumer.kind === "video" && remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = stream;
-        remoteVideoRef.current.play().catch(() => {});
+      if (consumer.kind === "audio") {
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = stream;
+          remoteAudioRef.current.play().catch(() => {});
+        }
+      } else if (consumer.kind === "video") {
+        // Stash the stream and flip the flag; the effect below attaches it
+        // once React has actually rendered the <video> element. Assigning
+        // to the ref here would be a no-op on the first video track,
+        // because the element doesn't exist yet.
+        pendingRemoteStreamRef.current = stream;
+        setRemoteHasVideo(true);
       }
       setStatus("Connected");
     }
@@ -155,6 +168,15 @@ export default function CallRoom() {
       recvTransportRef.current?.close();
     };
   }, [id]);
+
+  // Runs after the video element is mounted, which is the only point at
+  // which the ref is non-null.
+  useEffect(() => {
+    if (remoteHasVideo && pendingRemoteStreamRef.current && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = pendingRemoteStreamRef.current;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+  }, [remoteHasVideo]);
 
   function toggleMute() {
     const track = localStreamRef.current?.getAudioTracks()[0];
@@ -212,12 +234,14 @@ export default function CallRoom() {
       <h1 className="h-display" style={{ fontSize: 22, margin: 0 }}>{other?.displayName || "Call"}</h1>
       <p style={{ color: "var(--slate-400)", fontSize: 13, marginTop: 4 }}>{status} · {mmss}</p>
 
-      {hasVideo && (
+      {(hasVideo || remoteHasVideo) && (
         <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "center", flexWrap: "wrap" }}>
           <video ref={remoteVideoRef} autoPlay playsInline
             style={{ width: "100%", maxWidth: 360, borderRadius: 12, background: "#000", aspectRatio: "4/3", objectFit: "cover" }} />
-          <video ref={localVideoRef} autoPlay playsInline muted
-            style={{ width: 120, borderRadius: 10, background: "#000", aspectRatio: "4/3", objectFit: "cover", border: "1px solid var(--line)" }} />
+          {hasVideo && (
+            <video ref={localVideoRef} autoPlay playsInline muted
+              style={{ width: 120, borderRadius: 10, background: "#000", aspectRatio: "4/3", objectFit: "cover", border: "1px solid var(--line)" }} />
+          )}
         </div>
       )}
 

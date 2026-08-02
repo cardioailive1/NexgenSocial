@@ -37,6 +37,7 @@ export default function Navbar() {
             <NavLink to="/marketplace" style={navLinkStyle}>Market</NavLink>
             <NavLink to="/political" style={navLinkStyle}>Political</NavLink>
             <NavLink to="/premium" style={navLinkStyle}>Premium</NavLink>
+            <NavLink to="/meetings" style={navLinkStyle}>Meet</NavLink>
             <NavLink to="/messages" style={navLinkStyle}>Messages</NavLink>
             <NavLink to="/people" style={navLinkStyle}>People</NavLink>
             <NavLink to="/friends" style={navLinkStyle}>Friends</NavLink>
