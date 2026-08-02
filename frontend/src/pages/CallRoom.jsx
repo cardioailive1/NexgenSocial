@@ -42,25 +42,56 @@ export default function CallRoom() {
 
     async function setup() {
       try {
-        const { calls } = await api.get("/api/messages/calls/history");
-        const thisCall = calls.find((c) => c.id === id);
+        // Fetch THIS call directly. Previously we scanned /calls/history
+        // and picked the matching id -- but that list is capped at 50 and a
+        // just-created call can be absent, in which case `thisCall` was
+        // undefined, `wantVideo` silently became false, and the camera was
+        // never requested at all. That produced a black screen on every
+        // video call, with no error to explain it.
+        let thisCall = null;
+        try {
+          const res = await api.get(`/api/messages/calls/${id}/details`);
+          thisCall = res.call;
+        } catch (err) {
+          console.error("[call] couldn't load call details:", err.message);
+          setError("Couldn't load this call. It may have ended.");
+          return;
+        }
         if (cancelled) return;
-        setCall(thisCall || null);
+        setCall(thisCall);
 
         const wantVideo = thisCall?.kind === "VIDEO";
+        console.log("[call] kind:", thisCall?.kind, "→ requesting video:", wantVideo);
         let media;
         try {
           media = await navigator.mediaDevices.getUserMedia({ audio: true, video: wantVideo });
-        } catch {
-          setError("Microphone access was blocked. Allow it in your browser to take calls.");
+        } catch (err) {
+          // Distinguish the causes -- "blocked" and "no camera attached"
+          // look identical on screen but need completely different fixes.
+          const name = err?.name || "";
+          if (name === "NotAllowedError") {
+            setError("Camera/microphone access was denied. Click the padlock in your address bar → Site settings → allow Camera and Microphone, then reload.");
+          } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+            setError("No camera or microphone was found on this device.");
+          } else if (name === "NotReadableError") {
+            setError("Your camera is already in use by another app or tab. Close it and try again.");
+          } else {
+            setError(`Couldn't access camera/microphone: ${err?.message || name}`);
+          }
+          console.error("[call] getUserMedia failed:", err);
           return;
         }
+
+        console.log("[call] local tracks:", media.getTracks().map((t) => `${t.kind}:${t.readyState}`));
         localStreamRef.current = media;
-        setHasVideo(wantVideo);
-        if (wantVideo && localVideoRef.current) {
+        setHasVideo(wantVideo && media.getVideoTracks().length > 0);
+
+        if (localVideoRef.current) {
           localVideoRef.current.srcObject = media;
           localVideoRef.current.muted = true;
-          localVideoRef.current.play().catch(() => {});
+          // Chrome rejects play() if the element isn't laid out yet; a
+          // failure here is exactly what a black preview looks like.
+          localVideoRef.current.play().catch((e) => console.warn("[call] local play() rejected:", e?.message));
         }
 
         const ws = new WebSocket(wsSignalingUrl());
@@ -111,8 +142,15 @@ export default function CallRoom() {
 
           for (const p of existingProducers) await consume(p.producerId);
 
-          await api.patch(`/api/messages/calls/${id}`, { status: "ACTIVE" }).catch(() => {});
-          setStatus("Connected");
+          // Only the CALLEE marks a call active. The caller marking it
+          // active on entry was a real bug: it flipped the call out of
+          // RINGING within a second or two, so the callee's poll (which
+          // looks for RINGING) never found it and the phone never rang.
+          const iAmCallee = thisCall && thisCall.callee?.username === user?.username;
+          if (iAmCallee) {
+            await api.patch(`/api/messages/calls/${id}`, { status: "ACTIVE" }).catch(() => {});
+          }
+          setStatus(iAmCallee ? "Connected" : "Ringing…");
         };
 
         ws.onerror = () => setError("Couldn't reach the call server.");
@@ -145,6 +183,7 @@ export default function CallRoom() {
           remoteAudioRef.current.play().catch(() => {});
         }
       } else if (consumer.kind === "video") {
+        console.log("[call] remote video track received:", consumer.track.readyState);
         // Stash the stream and flip the flag; the effect below attaches it
         // once React has actually rendered the <video> element. Assigning
         // to the ref here would be a no-op on the first video track,
@@ -174,9 +213,20 @@ export default function CallRoom() {
   useEffect(() => {
     if (remoteHasVideo && pendingRemoteStreamRef.current && remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = pendingRemoteStreamRef.current;
-      remoteVideoRef.current.play().catch(() => {});
+      remoteVideoRef.current.play().catch((e) => console.warn("[call] remote play() rejected:", e?.message));
     }
   }, [remoteHasVideo]);
+
+  // The local preview has the same mount-order problem: hasVideo flips to
+  // true and only THEN does the <video> render, so assigning srcObject at
+  // getUserMedia time can hit a null ref and leave a black rectangle.
+  useEffect(() => {
+    if (hasVideo && localStreamRef.current && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.muted = true;
+      localVideoRef.current.play().catch((e) => console.warn("[call] local play() rejected:", e?.message));
+    }
+  }, [hasVideo]);
 
   function toggleMute() {
     const track = localStreamRef.current?.getAudioTracks()[0];
