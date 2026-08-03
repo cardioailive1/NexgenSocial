@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import PostCard from "../components/PostCard";
 import { useAuth } from "../AuthContext";
+import { MediaPicker } from "../components/MediaAttach";
 
 export default function Celebrity() {
   const { user } = useAuth();
   const [posts, setPosts] = useState(null);
   const [body, setBody] = useState("");
+  const [files, setFiles] = useState([]);
 
   async function load() {
     const { posts } = await api.get("/api/posts/explore?category=CELEBRITY");
@@ -16,13 +18,15 @@ export default function Celebrity() {
 
   async function submitPost(e) {
     e.preventDefault();
-    if (!body.trim()) return;
+    if (!body.trim() && files.length === 0) return;
     const formData = new FormData();
     formData.append("body", body);
     formData.append("category", "CELEBRITY");
     formData.append("audience", "PUBLIC");
+    files.forEach((f) => formData.append("media", f));
     await api.upload("/api/posts", formData);
     setBody("");
+    setFiles([]);
     load();
   }
 
@@ -38,7 +42,10 @@ export default function Celebrity() {
 
       <form onSubmit={submitPost} className="card" style={{ padding: 14, marginBottom: 16 }}>
         <textarea placeholder="Share something…" rows={2} value={body} onChange={(e) => setBody(e.target.value)} />
-        <button className="btn btn-primary" type="submit" style={{ marginTop: 8 }}>Post</button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <MediaPicker files={files} onChange={setFiles} max={10} />
+          <button className="btn btn-primary" type="submit">Post</button>
+        </div>
       </form>
 
       {posts === null && <p style={{ color: "var(--slate-400)" }}>Loading…</p>}

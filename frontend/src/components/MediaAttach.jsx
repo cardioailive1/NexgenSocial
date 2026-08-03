@@ -56,13 +56,23 @@ export function MediaPicker({ files, onChange, max = 10, label = "📷 Add photo
 }
 
 // Displays saved media with a gallery and per-item download links.
-export function MediaGallery({ media, legacyUrl, compact = false }) {
+export function MediaGallery({ media, legacyUrl, legacyKind, compact = false }) {
   const [index, setIndex] = useState(0);
   const [lightbox, setLightbox] = useState(null);
+
+  // Posts created before the PostMedia table existed only have mediaUrl.
+  // This previously assumed PHOTO, so an old video rendered as an <img>
+  // pointing at a .webm -- which displays nothing at all. Infer from the
+  // file extension when the caller doesn't tell us the kind.
+  const inferKind = (url) => {
+    if (legacyKind) return legacyKind;
+    return /\.(webm|mp4|mov|m4v|avi|mkv)$/i.test(url || "") ? "VIDEO" : "PHOTO";
+  };
+
   const items = media?.length
     ? [...media].sort((a, b) => a.position - b.position)
     : legacyUrl
-      ? [{ id: "legacy", url: legacyUrl, kind: "PHOTO" }]
+      ? [{ id: "legacy", url: legacyUrl, kind: inferKind(legacyUrl) }]
       : [];
 
   if (items.length === 0) return null;

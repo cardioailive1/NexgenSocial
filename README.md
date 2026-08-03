@@ -80,6 +80,35 @@ alongside `routes/messages.js`, and `Call` would gain a `phoneNumber` field
 plus a provider call id. Everything else — call records, status
 transitions, history — already generalises.
 
+### Push notifications — and what they can't do
+
+`backend/src/lib/push.js`, `routes/push.js`, `frontend/public/sw.js`,
+`frontend/src/push.js`.
+
+Calls and messages are delivered by Web Push, so they arrive when the site
+isn't open on screen. A service worker shows the notification; tapping it
+opens (or focuses) the call.
+
+**The limit, stated plainly because it's easy to promise otherwise:** Web
+Push requires the **browser to be running**. Minimised, backgrounded,
+other tabs, phone locked with the browser still open -- all fine. Browser
+fully quit, or swiped away from the app switcher on mobile -- **nothing
+arrives**. Waking a device from cold requires a native iOS/Android app
+registered with APNs or FCM. No amount of web code changes this, and the
+in-app prompt says so rather than overpromising.
+
+Call notifications use `requireInteraction`, so they stay on screen until
+acted on instead of auto-dismissing, and carry Answer/Decline actions.
+
+**Setup:**
+```bash
+npx web-push generate-vapid-keys
+fly secrets set VAPID_PUBLIC_KEY="..." VAPID_PRIVATE_KEY="..." -a <your-app>
+```
+Without these, push simply doesn't initialise and calls fall back to
+ringing only in an open tab -- the app logs this at boot rather than
+failing.
+
 ### Advertising payments
 
 Ads use a **fixed starter package**: $50 buys one day and roughly 1,000

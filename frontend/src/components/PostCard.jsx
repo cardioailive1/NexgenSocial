@@ -140,6 +140,9 @@ export default function PostCard({ post, viewerUsername, onChanged }) {
           <MediaGallery
             media={post.media}
             legacyUrl={post.mediaUrl}
+            // post.type is authoritative for older single-file posts;
+            // extension sniffing is only the fallback.
+            legacyKind={post.type === "VIDEO" ? "VIDEO" : post.type === "IMAGE" ? "PHOTO" : undefined}
             compact
           />
 

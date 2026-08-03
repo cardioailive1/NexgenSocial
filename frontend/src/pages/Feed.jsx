@@ -4,6 +4,7 @@ import PostCard from "../components/PostCard";
 import QuickVideoRecorder from "../components/QuickVideoRecorder";
 import SponsoredCard from "../components/SponsoredCard";
 import ProfileAlert from "../components/ProfileAlert";
+import PushPrompt from "../components/PushPrompt";
 import FriendSuggestions from "../components/FriendSuggestions";
 import { useAuth } from "../AuthContext";
 
@@ -83,6 +84,7 @@ export default function Feed() {
 
   return (
     <div className="container" style={{ maxWidth: 640, paddingTop: 28, paddingBottom: 60 }}>
+      <PushPrompt />
       <ProfileAlert />
       <FriendSuggestions limit={4} />
 
