@@ -80,6 +80,48 @@ alongside `routes/messages.js`, and `Call` would gain a `phoneNumber` field
 plus a provider call id. Everything else — call records, status
 transitions, history — already generalises.
 
+### Native iOS push (APNs)
+
+`backend/src/lib/apns.js`, endpoints in `routes/push.js`.
+
+Two delivery channels run side by side and both fire on every call and
+message: **Web Push** for browsers, **APNs** for the native iOS app.
+Sending to a channel someone isn't registered on is a cheap no-op, so
+there's no need to track which client they're using.
+
+APNs talks to Apple's HTTP/2 API directly rather than via `node-apn` --
+the protocol is small, and one fewer dependency matters for code that
+holds a signing key.
+
+**Two distinctions that cause most APNs bugs, both handled:**
+- **ALERT vs VOIP tokens are different values.** They need different
+  `apns-push-type` headers and different topics (VoIP requires a `.voip`
+  suffix on the bundle id, or Apple returns `TopicDisallowed`). Crossing
+  them fails silently.
+- **Sandbox vs production are separate gateways.** A development-build
+  token is rejected by the production gateway with `BadDeviceToken`. The
+  iOS app reports which environment it built against, and it's stored per
+  device.
+
+Dead tokens (`BadDeviceToken`, `Unregistered`) are deleted on failure
+rather than retried forever.
+
+**The VoIP contract:** iOS *terminates* an app that receives a VoIP push
+without reporting a call to CallKit. So `sendApnsVoIPCall` must only ever
+be used for a genuine incoming call -- never as a general wake-up.
+
+**Setup:**
+```bash
+fly secrets set \
+  APNS_KEY_P8="$(cat AuthKey_XXXXXXXX.p8)" \
+  APNS_KEY_ID="XXXXXXXXXX" \
+  APNS_TEAM_ID="YYYYYYYYYY" \
+  APNS_BUNDLE_ID="com.corverxis.nexgensocial" \
+  -a <your-app>
+```
+Without these, APNs logs that it's unconfigured at boot and iOS calls fall
+back to ringing only with the app open. Nothing crashes.
+
 ### Push notifications — and what they can't do
 
 `backend/src/lib/push.js`, `routes/push.js`, `frontend/public/sw.js`,
