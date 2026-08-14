@@ -35,6 +35,8 @@ import MeetingRoom from "./pages/MeetingRoom";
 import CallRoom from "./pages/CallRoom";
 import IncomingCall from "./components/IncomingCall";
 import LegalDoc from "./pages/LegalDoc";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -86,6 +88,10 @@ export default function App() {
             must be readable before signing up, since acceptance is required
             to create an account in the first place. */}
         <Route path="/legal/:doc" element={<LegalDoc />} />
+        {/* Both are reachable while signed out -- someone who can't sign in
+            is exactly who needs them. */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

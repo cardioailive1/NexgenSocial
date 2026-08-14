@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api";
+import PasswordField, { validateEmail, validatePassword } from "../components/PasswordField";
 import { POLICY_VERSION } from "../legal/documents";
 import PlatformHighlights from "../components/PlatformHighlights";
 import { useAuth } from "../AuthContext";
@@ -10,6 +11,8 @@ export default function Signup() {
   const [form, setForm] = useState({ displayName: "", username: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [accepted, setAccepted] = useState(false);
+  const [emailError, setEmailError] = useState(null);
+  const [passwordError, setPasswordError] = useState(null);
   const [busy, setBusy] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -29,6 +32,15 @@ export default function Signup() {
   async function onSubmit(e) {
     e.preventDefault();
     setError("");
+
+    // Caught inline rather than sent to the server and returned as a
+    // generic failure (UAT-010).
+    const emailProblem = validateEmail(form.email);
+    const passwordProblem = validatePassword(form.password, { minLength: 8 });
+    setEmailError(emailProblem);
+    setPasswordError(passwordProblem);
+    if (emailProblem || passwordProblem) return;
+
     if (!accepted) {
       setError("Please accept the Terms of Use and Privacy Policy to continue.");
       return;
@@ -68,8 +80,28 @@ export default function Signup() {
       <form onSubmit={onSubmit} className="card" style={{ padding: 24, display: "grid", gap: 14 }}>
         <input type="text" placeholder="Display name" value={form.displayName} onChange={set("displayName")} required />
         <input type="text" placeholder="Username" value={form.username} onChange={set("username")} required />
-        <input type="email" placeholder="Email" value={form.email} onChange={set("email")} required />
-        <input type="password" placeholder="Password (min 8 characters)" value={form.password} onChange={set("password")} required />
+        <div>
+          <input
+            type="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={(e) => { set("email")(e); setEmailError(null); }}
+            autoComplete="email"
+            style={emailError ? { borderColor: "var(--danger)" } : undefined}
+            aria-invalid={!!emailError}
+          />
+          {emailError && (
+            <div style={{ fontSize: 11.5, color: "var(--danger)", marginTop: 4 }}>{emailError}</div>
+          )}
+        </div>
+
+        <PasswordField
+          value={form.password}
+          onChange={(e) => { set("password")(e); setPasswordError(null); }}
+          placeholder="Password (min 8 characters)"
+          autoComplete="new-password"
+          error={passwordError}
+        />
         <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: "var(--slate-300)", lineHeight: 1.5 }}>
           <input
             type="checkbox"
