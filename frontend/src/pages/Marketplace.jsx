@@ -19,14 +19,18 @@ function MediaGallery({ media, coverUrl }) {
       <div style={{ position: "relative" }}>
         {current.kind === "VIDEO" ? (
           <video src={api.mediaUrl(current.url)} controls
-            style={{ width: "100%", aspectRatio: "4/3", objectFit: "contain", borderRadius: 10, background: "#000" }} />
+            style={{
+              display: "block", maxWidth: "100%", maxHeight: 420,
+              width: "auto", height: "auto", margin: "0 auto",
+              borderRadius: 10, background: "#000",
+            }} />
         ) : (
           <img src={api.mediaUrl(current.url)} alt=""
+            // Sizes to the photo's own aspect ratio. A forced 4:3 box meant
+            // a portrait item photo sat inside heavy black bars.
             style={{
-              width: "100%", aspectRatio: "4/3",
-              // contain, not cover: a portrait photo of an item was being
-              // cropped top and bottom, hiding part of what's for sale.
-              objectFit: "contain", background: "var(--navy-950)",
+              display: "block", maxWidth: "100%", maxHeight: 420,
+              width: "auto", height: "auto", margin: "0 auto",
               borderRadius: 10,
             }} />
         )}

@@ -77,32 +77,48 @@ export function MediaGallery({ media, legacyUrl, legacyKind, compact = false }) 
 
   if (items.length === 0) return null;
   const current = items[Math.min(index, items.length - 1)];
-  const maxH = compact ? 260 : 420;
+  const maxH = compact ? 420 : 560;
 
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ position: "relative" }}>
+        {/* The element sizes to the media's OWN aspect ratio rather than
+            filling a fixed-height box. Constraining height and using
+            object-fit padded portrait media with big black bars; capping
+            max-height while letting width follow naturally means the frame
+            is exactly the size of the picture, so there's nothing to pad. */}
         {current.kind === "VIDEO" ? (
-          <video src={api.mediaUrl(current.url)} controls
-            style={{ width: "100%", borderRadius: 10, background: "#000", maxHeight: maxH, objectFit: "contain", border: "1px solid var(--line)" }} />
+          <video
+            src={api.mediaUrl(current.url)}
+            controls
+            playsInline
+            style={{
+              display: "block",
+              maxWidth: "100%",
+              maxHeight: maxH,
+              width: "auto",
+              height: "auto",
+              margin: "0 auto",
+              borderRadius: 10,
+              border: "1px solid var(--line)",
+              background: "#000",
+            }}
+          />
         ) : (
           <img
             src={api.mediaUrl(current.url)}
             alt={current.caption || ""}
             onClick={() => setLightbox(current)}
             style={{
-              width: "100%", borderRadius: 10, maxHeight: maxH,
-              // "contain" not "cover": cover crops anything whose aspect
-              // ratio doesn't match the box, which chopped the top and
-              // bottom off portrait photos. contain scales the whole image
-              // to fit, so nothing is lost.
-              objectFit: "contain",
-              // A dark backdrop so letterboxing reads as intentional
-              // rather than looking like a rendering fault.
-              background: "var(--navy-950)",
+              display: "block",
+              maxWidth: "100%",
+              maxHeight: maxH,
+              width: "auto",
+              height: "auto",
+              margin: "0 auto",
+              borderRadius: 10,
               border: "1px solid var(--line)",
               cursor: "zoom-in",
-              display: "block",
             }}
           />
         )}

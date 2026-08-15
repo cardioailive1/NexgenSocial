@@ -40,7 +40,7 @@ export default function ForgotPassword() {
           </p>
           <p style={{ fontSize: 12.5, color: "var(--slate-400)", lineHeight: 1.6 }}>
             Nothing arrived? Check your spam folder, and make sure you used the
-            address you signed up with.
+            address you signed up with. Delivery can take a couple of minutes.
           </p>
           <Link to="/login" className="btn btn-primary">Back to sign in</Link>
         </div>
